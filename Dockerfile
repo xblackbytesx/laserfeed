@@ -19,12 +19,14 @@ RUN go mod download
 # Copy source (go.sum excluded by .dockerignore so the downloaded one is preserved)
 COPY . .
 
-# Tidy ensures go.sum is complete for all packages actually imported in source.
-# This is a safety net against stale cached go mod download layers.
-RUN go mod tidy
-
+# Generate templ files first — web/templates/pages/*.go must exist before
+# go mod tidy can recognise the package as local (not a missing remote module).
 RUN go install github.com/a-h/templ/cmd/templ@v0.3.857 && \
     templ generate
+
+# Tidy ensures go.sum is complete for every package actually imported in source,
+# guarding against stale cached go mod download layers.
+RUN go mod tidy
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o laserfeed ./cmd/laserfeed
 
