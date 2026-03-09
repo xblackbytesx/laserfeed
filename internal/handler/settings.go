@@ -58,11 +58,9 @@ func (h *SettingsHandler) Post(c echo.Context) error {
 		"placeholder_image_url": c.FormValue("placeholder_image_url"),
 		"max_articles_per_feed": strconv.Itoa(maxArticles),
 	}
-	for k, v := range pairs {
-		if err := h.settings.Set(ctx, k, v); err != nil {
-			slog.Error("save setting", "key", k, "err", err)
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to save settings")
-		}
+	if err := h.settings.SetAll(ctx, pairs); err != nil {
+		slog.Error("save settings", "err", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to save settings")
 	}
 	return redirect(c, "/settings")
 }

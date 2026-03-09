@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -30,7 +31,8 @@ func (h *FeedOutHandler) ChannelFeed(c echo.Context) error {
 
 	channelFeeds, err := h.channels.ListFeeds(ctx, ch.ID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		slog.Error("list channel feeds for output", "channel_id", ch.ID, "err", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channel feeds")
 	}
 
 	feedIDs := make([]string, len(channelFeeds))
@@ -40,12 +42,14 @@ func (h *FeedOutHandler) ChannelFeed(c echo.Context) error {
 
 	arts, err := h.articles.ListByFeedIDs(ctx, feedIDs, 100, 0)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		slog.Error("list articles for channel feed", "channel_id", ch.ID, "err", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load articles")
 	}
 
 	atomBytes, err := feedout.GenerateAtom(ch, arts, h.appBaseURL)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		slog.Error("generate atom feed", "channel_id", ch.ID, "err", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to generate feed")
 	}
 
 	return c.Blob(http.StatusOK, "application/atom+xml; charset=utf-8", atomBytes)
@@ -56,10 +60,10 @@ func (h *FeedOutHandler) AllFeed(c echo.Context) error {
 
 	arts, err := h.articles.ListRecent(ctx, 100, 0)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		slog.Error("list recent articles for all feed", "err", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load articles")
 	}
 
-	// Synthetic channel for the all-feeds output
 	allCh := &channel.Channel{
 		Name: "LaserFeed — All",
 		Slug: "all",
@@ -67,7 +71,8 @@ func (h *FeedOutHandler) AllFeed(c echo.Context) error {
 
 	atomBytes, err := feedout.GenerateAtom(allCh, arts, h.appBaseURL)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		slog.Error("generate all-feeds atom", "err", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to generate feed")
 	}
 
 	return c.Blob(http.StatusOK, "application/atom+xml; charset=utf-8", atomBytes)

@@ -14,5 +14,6 @@ type Settings struct {
 
 type Repository interface {
 	Get(ctx context.Context) (*Settings, error)
-	Set(ctx context.Context, key, value string) error
+	// SetAll persists all key/value pairs in a single round-trip.
+	SetAll(ctx context.Context, pairs map[string]string) error
 }

@@ -104,19 +104,7 @@ func (m *Manager) ReScrapeArticles(feedID string) {
 			return
 		}
 
-		userAgent := globalSettings.UserAgent
-		if f.UserAgent != nil && *f.UserAgent != "" {
-			userAgent = *f.UserAgent
-		}
-		selector := ""
-		if f.ScrapeSelector != nil {
-			selector = *f.ScrapeSelector
-		}
-		selectorType := string(f.ScrapeSelectorType)
-		cookies := ""
-		if f.ScrapeCookies != nil {
-			cookies = *f.ScrapeCookies
-		}
+		sp := resolveScrapeParams(f, globalSettings.UserAgent)
 
 		refs, err := m.stores.Articles.ListForReScrape(ctx, feedID)
 		if err != nil {
@@ -134,14 +122,14 @@ func (m *Manager) ReScrapeArticles(feedID string) {
 			default:
 			}
 
-			scraped, err := m.scraper.ScrapeContent(ctx, ref.URL, userAgent, selector, selectorType, cookies)
+			scraped, err := m.scraper.ScrapeContent(ctx, ref.URL, sp.userAgent, sp.selector, sp.selectorType, sp.cookies)
 			var errMsg string
 			switch {
 			case err != nil:
 				errMsg = err.Error()
 			case strings.TrimSpace(scraped) == "":
-				if selector != "" {
-					errMsg = fmt.Sprintf("selector %q matched no content", selector)
+				if sp.selector != "" {
+					errMsg = fmt.Sprintf("selector %q matched no content", sp.selector)
 				} else {
 					errMsg = "no content could be extracted from the page"
 				}

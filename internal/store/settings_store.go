@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/laserfeed/laserfeed/internal/domain/settings"
@@ -54,14 +55,23 @@ func (s *SettingsStore) Get(ctx context.Context) (*settings.Settings, error) {
 	}, nil
 }
 
-func (s *SettingsStore) Set(ctx context.Context, key, value string) error {
-	_, err := s.db.Exec(ctx,
-		`INSERT INTO global_settings (key, value, updated_at) VALUES ($1,$2,NOW())
-		ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`,
-		key, value,
-	)
-	if err != nil {
-		return fmt.Errorf("set setting: %w", err)
+func (s *SettingsStore) SetAll(ctx context.Context, pairs map[string]string) error {
+	if len(pairs) == 0 {
+		return nil
+	}
+	args := make([]any, 0, len(pairs)*2)
+	placeholders := make([]string, 0, len(pairs))
+	i := 1
+	for k, v := range pairs {
+		placeholders = append(placeholders, fmt.Sprintf("($%d,$%d,NOW())", i, i+1))
+		args = append(args, k, v)
+		i += 2
+	}
+	query := `INSERT INTO global_settings (key, value, updated_at) VALUES ` +
+		strings.Join(placeholders, ",") +
+		` ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`
+	if _, err := s.db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("set settings: %w", err)
 	}
 	return nil
 }

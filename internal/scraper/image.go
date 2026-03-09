@@ -21,8 +21,8 @@ import (
 //     "extract"     → first <img> found in description then content HTML
 func ExtractThumbnail(item *gofeed.Item, descHTML, contentHTML, imageMode, placeholderURL, guid string) string {
 	// Step 1: always prefer officially-provided feed media.
-	if url := extractFeedMedia(item); url != "" {
-		return url
+	if mediaURL := extractFeedMedia(item); mediaURL != "" {
+		return mediaURL
 	}
 
 	// Step 2: nothing in the feed — apply the configured fallback strategy.
@@ -34,8 +34,8 @@ func ExtractThumbnail(item *gofeed.Item, descHTML, contentHTML, imageMode, place
 	case "random":
 		return fmt.Sprintf("https://api.dicebear.com/7.x/identicon/svg?seed=%s", url.QueryEscape(guid))
 	case "extract":
-		if url := firstImgSrc(descHTML); url != "" {
-			return url
+		if imgURL := firstImgSrc(descHTML); imgURL != "" {
+			return imgURL
 		}
 		return firstImgSrc(contentHTML)
 	default:

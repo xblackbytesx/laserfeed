@@ -1,8 +1,8 @@
 /*
  * Pre-declare Shoelace CSS custom properties so they are already set when the
- * browser first paints, before the CDN stylesheet finishes loading. This
- * eliminates the font/size jump caused by Shoelace's variables being applied
- * a fraction of a second after the initial render.
+ * browser first paints, before the local vendor stylesheet finishes loading.
+ * This eliminates the font/size jump caused by Shoelace's variables being
+ * applied a fraction of a second after the initial render.
  */
 :root {
   /* Fonts — mirror Shoelace defaults exactly */
@@ -286,7 +286,6 @@ body {
 
 .form-footer { margin-top: 1.5rem; }
 
-sl-card { display: block; }
 sl-card::part(body) { padding: 1rem; }
 
 .muted { color: var(--color-muted); font-size: .9rem; }

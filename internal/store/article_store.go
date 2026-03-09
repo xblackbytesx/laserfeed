@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/laserfeed/laserfeed/internal/domain/article"
@@ -156,7 +155,7 @@ func (s *ArticleStore) ListForReScrape(ctx context.Context, feedID string) ([]*a
 func (s *ArticleStore) PurgeScrapeContent(ctx context.Context, feedID string) error {
 	_, err := s.db.Exec(ctx,
 		`UPDATE articles SET content='', scrape_status='none', scrape_error=NULL
-		WHERE feed_id=$1 AND scrape_status='success'`,
+		WHERE feed_id=$1 AND scrape_status != 'none'`,
 		feedID,
 	)
 	if err != nil {
@@ -208,21 +207,12 @@ func (s *ArticleStore) ListByFeedIDs(ctx context.Context, feedIDs []string, limi
 	if len(feedIDs) == 0 {
 		return nil, nil
 	}
-	placeholders := make([]string, len(feedIDs))
-	args := make([]any, len(feedIDs)+2)
-	for i, id := range feedIDs {
-		placeholders[i] = fmt.Sprintf("$%d", i+1)
-		args[i] = id
-	}
-	args[len(feedIDs)] = limit
-	args[len(feedIDs)+1] = offset
-	query := fmt.Sprintf(
+	rows, err := s.db.Query(ctx,
 		`SELECT `+articleCols+` FROM articles
-		WHERE feed_id IN (%s) AND is_filtered_out=false
-		ORDER BY published_at DESC LIMIT $%d OFFSET $%d`,
-		strings.Join(placeholders, ","), len(feedIDs)+1, len(feedIDs)+2,
+		WHERE feed_id = ANY($1) AND is_filtered_out=false
+		ORDER BY published_at DESC LIMIT $2 OFFSET $3`,
+		feedIDs, limit, offset,
 	)
-	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list articles by feed ids: %w", err)
 	}
@@ -258,15 +248,6 @@ func (s *ArticleStore) ListRecent(ctx context.Context, limit, offset int) ([]*ar
 		articles = append(articles, a)
 	}
 	return articles, rows.Err()
-}
-
-func (s *ArticleStore) CountByFeedID(ctx context.Context, feedID string) (int, error) {
-	var count int
-	err := s.db.QueryRow(ctx, `SELECT COUNT(*) FROM articles WHERE feed_id=$1`, feedID).Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("count articles: %w", err)
-	}
-	return count, nil
 }
 
 func (s *ArticleStore) DeleteOldest(ctx context.Context, feedID string, keepCount int) error {

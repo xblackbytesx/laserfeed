@@ -33,5 +33,6 @@ type FilterRule struct {
 type Repository interface {
 	Create(ctx context.Context, r *FilterRule) (*FilterRule, error)
 	ListByFeedID(ctx context.Context, feedID string) ([]*FilterRule, error)
-	Delete(ctx context.Context, id string) error
+	// Delete removes a rule only if it belongs to the specified feed.
+	Delete(ctx context.Context, feedID, ruleID string) error
 }

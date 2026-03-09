@@ -10,14 +10,14 @@ import (
 )
 
 type atomFeed struct {
-	XMLName  xml.Name    `xml:"feed"`
-	XMLNS    string      `xml:"xmlns,attr"`
-	MediaNS  string      `xml:"xmlns:media,attr"`
-	Title    string      `xml:"title"`
-	ID       string      `xml:"id"`
-	Updated  string      `xml:"updated"`
-	Link     []atomLink  `xml:"link"`
-	Entries  []atomEntry `xml:"entry"`
+	XMLName xml.Name    `xml:"feed"`
+	XMLNS   string      `xml:"xmlns,attr"`
+	MediaNS string      `xml:"xmlns:media,attr"`
+	Title   string      `xml:"title"`
+	ID      string      `xml:"id"`
+	Updated string      `xml:"updated"`
+	Link    []atomLink  `xml:"link"`
+	Entries []atomEntry `xml:"entry"`
 }
 
 type atomLink struct {
@@ -27,14 +27,14 @@ type atomLink struct {
 }
 
 type atomEntry struct {
-	Title     string         `xml:"title"`
-	ID        string         `xml:"id"`
-	Updated   string         `xml:"updated"`
-	Published string         `xml:"published"`
-	Link      atomLink       `xml:"link"`
-	Author    *atomAuthor    `xml:"author,omitempty"`
-	Summary   *atomText      `xml:"summary,omitempty"`
-	Content   *atomText      `xml:"content,omitempty"`
+	Title     string          `xml:"title"`
+	ID        string          `xml:"id"`
+	Updated   string          `xml:"updated"`
+	Published string          `xml:"published"`
+	Link      atomLink        `xml:"link"`
+	Author    *atomAuthor     `xml:"author,omitempty"`
+	Summary   *atomText       `xml:"summary,omitempty"`
+	Content   *atomText       `xml:"content,omitempty"`
 	Thumbnail *mediaThumbnail `xml:"media:thumbnail,omitempty"`
 }
 
@@ -69,9 +69,15 @@ func GenerateAtom(ch *channel.Channel, articles []*article.Article, appBaseURL s
 	}
 
 	for _, a := range articles {
+		// Prefer GUID as the stable Atom entry ID; fall back to URL.
+		entryID := a.GUID
+		if entryID == "" {
+			entryID = a.URL
+		}
+
 		entry := atomEntry{
 			Title:     a.Title,
-			ID:        a.URL,
+			ID:        entryID,
 			Updated:   a.PublishedAt.UTC().Format(time.RFC3339),
 			Published: a.PublishedAt.UTC().Format(time.RFC3339),
 			Link:      atomLink{Href: a.URL, Rel: "alternate"},
@@ -91,7 +97,7 @@ func GenerateAtom(ch *channel.Channel, articles []*article.Article, appBaseURL s
 		feed.Entries = append(feed.Entries, entry)
 	}
 
-	out, err := xml.MarshalIndent(feed, "", "  ")
+	out, err := xml.Marshal(feed)
 	if err != nil {
 		return nil, fmt.Errorf("marshal atom: %w", err)
 	}

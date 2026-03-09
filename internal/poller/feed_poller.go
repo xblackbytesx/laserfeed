@@ -22,6 +22,36 @@ type Stores struct {
 	Settings    settings.Repository
 }
 
+// scrapeParams holds the resolved scraping configuration for a single feed,
+// merging per-feed overrides on top of global defaults.
+type scrapeParams struct {
+	userAgent    string
+	selector     string
+	selectorType string
+	cookies      string
+}
+
+func resolveScrapeParams(f *feed.Feed, globalUA string) scrapeParams {
+	ua := globalUA
+	if f.UserAgent != nil && *f.UserAgent != "" {
+		ua = *f.UserAgent
+	}
+	sel := ""
+	if f.ScrapeSelector != nil {
+		sel = *f.ScrapeSelector
+	}
+	ck := ""
+	if f.ScrapeCookies != nil {
+		ck = *f.ScrapeCookies
+	}
+	return scrapeParams{
+		userAgent:    ua,
+		selector:     sel,
+		selectorType: string(f.ScrapeSelectorType),
+		cookies:      ck,
+	}
+}
+
 func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scraper) {
 	f, err := stores.Feeds.GetByID(ctx, feedID)
 	if err != nil {
@@ -35,10 +65,7 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		return
 	}
 
-	userAgent := globalSettings.UserAgent
-	if f.UserAgent != nil && *f.UserAgent != "" {
-		userAgent = *f.UserAgent
-	}
+	sp := resolveScrapeParams(f, globalSettings.UserAgent)
 
 	imageMode := string(globalSettings.ImageMode)
 	if string(f.ImageMode) != "" {
@@ -49,17 +76,7 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		placeholderURL = *f.PlaceholderImageURL
 	}
 
-	selector := ""
-	if f.ScrapeSelector != nil {
-		selector = *f.ScrapeSelector
-	}
-	selectorType := string(f.ScrapeSelectorType)
-	cookies := ""
-	if f.ScrapeCookies != nil {
-		cookies = *f.ScrapeCookies
-	}
-
-	parsedFeed, err := sc.FetchFeed(ctx, f.URL, userAgent)
+	parsedFeed, err := sc.FetchFeed(ctx, f.URL, sp.userAgent)
 	now := time.Now()
 	if err != nil {
 		errStr := err.Error()
@@ -98,7 +115,7 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		var scrapeError string
 
 		if f.ScrapeFullContent && item.Link != "" && !scrapedGUIDs[guid] {
-			scraped, err := sc.ScrapeContent(ctx, item.Link, userAgent, selector, selectorType, cookies)
+			scraped, err := sc.ScrapeContent(ctx, item.Link, sp.userAgent, sp.selector, sp.selectorType, sp.cookies)
 			switch {
 			case err != nil:
 				slog.Warn("poller: scrape content", "url", item.Link, "err", err)
@@ -106,8 +123,8 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 				scrapeError = err.Error()
 				content = item.Content
 			case strings.TrimSpace(scraped) == "":
-				if selector != "" {
-					scrapeError = fmt.Sprintf("selector %q matched no content", selector)
+				if sp.selector != "" {
+					scrapeError = fmt.Sprintf("selector %q matched no content", sp.selector)
 				} else {
 					scrapeError = "no content could be extracted from the page"
 				}
@@ -130,6 +147,7 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 
 		description := item.Description
 		thumbnail := scraper.ExtractThumbnail(item, description, content, imageMode, placeholderURL, guid)
+
 
 		publishedAt := time.Now()
 		if item.PublishedParsed != nil {

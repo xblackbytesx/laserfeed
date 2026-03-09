@@ -63,8 +63,11 @@ func (s *FilterRuleStore) ListByFeedID(ctx context.Context, feedID string) ([]*f
 	return rules, rows.Err()
 }
 
-func (s *FilterRuleStore) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx, `DELETE FROM feed_filter_rules WHERE id=$1`, id)
+func (s *FilterRuleStore) Delete(ctx context.Context, feedID, ruleID string) error {
+	_, err := s.db.Exec(ctx,
+		`DELETE FROM feed_filter_rules WHERE id=$1 AND feed_id=$2`,
+		ruleID, feedID,
+	)
 	if err != nil {
 		return fmt.Errorf("delete filter rule: %w", err)
 	}

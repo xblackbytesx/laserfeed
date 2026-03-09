@@ -89,7 +89,7 @@ func (h *RulesHandler) Delete(c echo.Context) error {
 	feedID := c.Param("id")
 	ruleID := c.Param("rid")
 
-	if err := h.rules.Delete(ctx, ruleID); err != nil {
+	if err := h.rules.Delete(ctx, feedID, ruleID); err != nil {
 		slog.Error("delete filter rule", "rule_id", ruleID, "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete rule")
 	}
