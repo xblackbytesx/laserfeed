@@ -12,11 +12,16 @@ RUN npm install && \
     cp node_modules/htmx.org/dist/htmx.min.js web/static/vendor/htmx.min.js && \
     rm -rf node_modules
 
-# Go build
+# Download Go dependencies (cached layer — only re-runs when go.mod changes)
 COPY go.mod ./
 RUN go mod download
 
+# Copy source (go.sum excluded by .dockerignore so the downloaded one is preserved)
 COPY . .
+
+# Tidy ensures go.sum is complete for all packages actually imported in source.
+# This is a safety net against stale cached go mod download layers.
+RUN go mod tidy
 
 RUN go install github.com/a-h/templ/cmd/templ@v0.3.857 && \
     templ generate
