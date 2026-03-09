@@ -1,0 +1,55 @@
+package pages
+
+import (
+	"fmt"
+	"github.com/laserfeed/laserfeed/internal/domain/article"
+	"github.com/laserfeed/laserfeed/internal/domain/channel"
+	"github.com/laserfeed/laserfeed/web/templates/components"
+	"github.com/laserfeed/laserfeed/web/templates/layouts"
+)
+
+templ Dashboard(csrfToken string, articles []*article.Article, channels []*channel.Channel, page int) {
+	@layouts.Base("Dashboard", csrfToken) {
+		<div class="page-header">
+			<h1>Dashboard</h1>
+		</div>
+		<div class="dashboard-grid">
+			<section class="channels-sidebar">
+				<h2>Channels</h2>
+				if len(channels) == 0 {
+					<p class="muted">No channels yet. <a href="/channels">Create one.</a></p>
+				}
+				for _, ch := range channels {
+					<sl-card class="channel-card">
+						<div slot="header">{ ch.Name }</div>
+						<div>
+							if ch.Description != "" {
+								<p>{ ch.Description }</p>
+							}
+							<a href={ templ.SafeURL("/channels/" + ch.Slug + "/feed.rss") } target="_blank">
+								<sl-icon name="rss"></sl-icon> RSS Feed
+							</a>
+						</div>
+					</sl-card>
+				}
+			</section>
+			<section class="articles-main">
+				<h2>Recent Articles</h2>
+				<div class="articles-grid" id="articles-grid">
+					for _, a := range articles {
+						@components.ArticleCard(a)
+					}
+				</div>
+				if len(articles) == 20 {
+					<div
+						hx-get={ fmt.Sprintf("/?page=%d", page+1) }
+						hx-trigger="revealed"
+						hx-target="#articles-grid"
+						hx-swap="beforeend"
+						hx-select=".article-card"
+					></div>
+				}
+			</section>
+		</div>
+	}
+}

@@ -1,0 +1,22 @@
+package components
+
+import (
+	"github.com/laserfeed/laserfeed/internal/domain/article"
+)
+
+templ ArticleCard(a *article.Article) {
+	<sl-card class="article-card">
+		if a.ThumbnailURL != "" {
+			<img slot="image" src={ a.ThumbnailURL } alt="" class="article-thumb" loading="lazy"/>
+		}
+		<div class="article-content">
+			<a href={ templ.SafeURL(a.URL) } target="_blank" rel="noopener" class="article-title">{ a.Title }</a>
+			if a.Author != "" {
+				<div class="article-meta">by { a.Author }</div>
+			}
+			<div class="article-meta">
+				<sl-relative-time date={ a.PublishedAt.UTC().Format("2006-01-02T15:04:05Z") }></sl-relative-time>
+			</div>
+		</div>
+	</sl-card>
+}

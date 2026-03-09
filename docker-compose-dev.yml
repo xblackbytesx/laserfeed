@@ -1,0 +1,40 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://laserfeed:laserfeed@db:5432/laserfeed?sslmode=disable
+      CSRF_AUTH_KEY: dev-csrf-key-32-chars-minimum!!
+      APP_BASE_URL: http://localhost:8080
+      PORT: "8080"
+    volumes:
+      - .:/app
+      # Anonymous volume shadows the bind-mount for the vendor directory so
+      # the Shoelace + HTMX files baked into the image during `docker build`
+      # are never overwritten by the host bind-mount.
+      - /app/web/static/vendor
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: laserfeed
+      POSTGRES_PASSWORD: laserfeed
+      POSTGRES_DB: laserfeed
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U laserfeed"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata_dev:

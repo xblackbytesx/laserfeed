@@ -1,0 +1,54 @@
+package pages
+
+import (
+	"strconv"
+	"github.com/laserfeed/laserfeed/internal/domain/settings"
+	"github.com/laserfeed/laserfeed/web/templates/layouts"
+)
+
+templ SettingsPage(csrfToken string, s *settings.Settings) {
+	@layouts.Base("Settings", csrfToken) {
+		<div class="page-header">
+			<h1>Global Settings</h1>
+		</div>
+		<sl-card style="max-width:640px">
+			<form method="POST" action="/settings" class="edit-form">
+				<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+
+				<fieldset class="form-section">
+					<legend>Fetching</legend>
+					<sl-input name="user_agent" label="Default User-Agent" value={ s.UserAgent }></sl-input>
+					<sl-input name="poll_interval_seconds" label="Default poll interval (seconds)"
+						type="number" value={ strconv.Itoa(s.PollIntervalSeconds) }></sl-input>
+					<sl-input name="max_articles_per_feed" label="Max articles kept per feed"
+						type="number" value={ strconv.Itoa(s.MaxArticlesPerFeed) }
+						help-text="Oldest articles are deleted once this limit is reached"></sl-input>
+				</fieldset>
+
+				<fieldset class="form-section">
+					<legend>Thumbnails</legend>
+					<p class="muted small" style="margin-bottom:.25rem">
+						Feed-provided images (<code>media:thumbnail</code>, enclosures) are always used first.
+						This setting is the <strong>fallback</strong> applied only when the feed provides nothing.
+					</p>
+					<sl-select name="image_mode" label="Default fallback image mode" value={ s.ImageMode }>
+						<sl-option value="extract">Extract first &lt;img&gt; from content</sl-option>
+						<sl-option value="none">None — leave blank</sl-option>
+						<sl-option value="placeholder">Fixed placeholder URL</sl-option>
+						<sl-option value="random">Random identicon (per article)</sl-option>
+					</sl-select>
+					<sl-input name="placeholder_image_url" label="Default placeholder image URL"
+						value={ s.PlaceholderImageURL }
+						placeholder="https://example.com/placeholder.png"></sl-input>
+				</fieldset>
+
+				<div class="form-actions">
+					<sl-button type="submit" variant="primary">
+						<sl-icon slot="prefix" name="check2"></sl-icon>
+						Save Settings
+					</sl-button>
+				</div>
+			</form>
+		</sl-card>
+	}
+}

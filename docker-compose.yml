@@ -1,0 +1,31 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://laserfeed:laserfeed@db:5432/laserfeed?sslmode=disable
+      CSRF_AUTH_KEY: ${CSRF_AUTH_KEY:-changeme-32-chars-minimum-here!!}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
+      PORT: "8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: laserfeed
+      POSTGRES_PASSWORD: laserfeed
+      POSTGRES_DB: laserfeed
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U laserfeed"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

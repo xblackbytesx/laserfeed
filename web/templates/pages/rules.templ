@@ -1,0 +1,76 @@
+package pages
+
+import (
+	"github.com/laserfeed/laserfeed/internal/domain/feed"
+	"github.com/laserfeed/laserfeed/internal/domain/filterrule"
+	"github.com/laserfeed/laserfeed/web/templates/layouts"
+)
+
+templ RulesPage(csrfToken string, f *feed.Feed, rules []*filterrule.FilterRule) {
+	@layouts.Base("Filter Rules", csrfToken) {
+		<div class="page-header">
+			<h1>Filter Rules: { f.Name }</h1>
+			<sl-button href="/feeds">Back to Feeds</sl-button>
+		</div>
+		<sl-card>
+			<h3>Add Rule</h3>
+			<form
+				hx-post={ "/feeds/" + f.ID + "/rules" }
+				hx-target="#rules-list"
+				hx-swap="innerHTML"
+				hx-on::after-request="this.reset()"
+			>
+				<div class="form-row">
+					<sl-select name="rule_type" label="Type" value="blacklist">
+						<sl-option value="blacklist">Blacklist</sl-option>
+						<sl-option value="whitelist">Whitelist</sl-option>
+					</sl-select>
+					<sl-select name="match_field" label="Field" value="title">
+						<sl-option value="title">Title</sl-option>
+						<sl-option value="url">URL</sl-option>
+						<sl-option value="description">Description</sl-option>
+						<sl-option value="content">Content</sl-option>
+					</sl-select>
+					<sl-input name="match_pattern" label="Pattern" placeholder="Ask HN" required></sl-input>
+					<sl-button type="submit" variant="primary">Add Rule</sl-button>
+				</div>
+			</form>
+		</sl-card>
+		<sl-card>
+			<h3>Active Rules</h3>
+			<div id="rules-list">
+				@RulesList(csrfToken, f.ID, rules)
+			</div>
+		</sl-card>
+	}
+}
+
+templ RulesList(csrfToken string, feedID string, rules []*filterrule.FilterRule) {
+	if len(rules) == 0 {
+		<p class="muted">No rules configured. All articles are kept.</p>
+	}
+	for _, r := range rules {
+		<div class="rule-row">
+			<sl-badge variant={ ruleVariant(r.RuleType) }>{ string(r.RuleType) }</sl-badge>
+			<span>{ string(r.MatchField) }</span>
+			<code>{ r.MatchPattern }</code>
+			<form
+				hx-post={ "/feeds/" + feedID + "/rules/" + r.ID + "/delete" }
+				hx-target="#rules-list"
+				hx-swap="innerHTML"
+				style="display:inline"
+			>
+				<sl-button size="small" variant="danger" type="submit">
+					<sl-icon name="trash"></sl-icon>
+				</sl-button>
+			</form>
+		</div>
+	}
+}
+
+func ruleVariant(rt filterrule.RuleType) string {
+	if rt == filterrule.RuleTypeWhitelist {
+		return "success"
+	}
+	return "danger"
+}

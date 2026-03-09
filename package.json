@@ -1,0 +1,9 @@
+{
+  "name": "laserfeed",
+  "private": true,
+  "description": "Front-end dependencies for LaserFeed (no bundler — files are copied to web/static at build time)",
+  "dependencies": {
+    "@shoelace-style/shoelace": "2.19.1",
+    "htmx.org": "2.0.4"
+  }
+}

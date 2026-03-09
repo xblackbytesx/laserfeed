@@ -1,0 +1,74 @@
+package pages
+
+import (
+	"github.com/laserfeed/laserfeed/internal/domain/channel"
+	"github.com/laserfeed/laserfeed/web/templates/layouts"
+)
+
+templ ChannelList(csrfToken string, channels []*channel.Channel) {
+	@layouts.Base("Channels", csrfToken) {
+		<div class="page-header">
+			<h1>Channels</h1>
+			<sl-button variant="primary" onclick="document.getElementById('add-channel-dialog').show()">
+				<sl-icon slot="prefix" name="plus-circle"></sl-icon>
+				New Channel
+			</sl-button>
+		</div>
+		<sl-dialog label="New Channel" id="add-channel-dialog">
+			<form method="POST" action="/channels" class="dialog-form">
+				<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+				<sl-input name="name" label="Name" required placeholder="Tech News" id="channel-name-input"></sl-input>
+				<sl-input name="slug" label="URL slug" required placeholder="tech-news" id="channel-slug-input"
+					help-text="Used in the RSS URL: /channels/tech-news/feed.rss"></sl-input>
+				<sl-textarea name="description" label="Description" placeholder="Optional description" rows="2"></sl-textarea>
+				<div class="dialog-footer">
+					<sl-button onclick="document.getElementById('add-channel-dialog').hide()" variant="neutral">Cancel</sl-button>
+					<sl-button type="submit" variant="primary">
+						<sl-icon slot="prefix" name="plus-circle"></sl-icon>
+						Create Channel
+					</sl-button>
+				</div>
+			</form>
+		</sl-dialog>
+		if len(channels) == 0 {
+			<sl-card>
+				<div class="empty-state">
+					<sl-icon name="collection" style="font-size:2rem;color:var(--color-muted)"></sl-icon>
+					<p>No channels yet. Create one to combine feeds into a single RSS output.</p>
+				</div>
+			</sl-card>
+		}
+		<div class="channel-list">
+			for _, ch := range channels {
+				<sl-card class="channel-row">
+					<div class="channel-row-header">
+						<div>
+							<strong>{ ch.Name }</strong>
+							<code class="slug-pill">/{ ch.Slug }</code>
+							if ch.Description != "" {
+								<p class="muted small" style="margin-top:.25rem">{ ch.Description }</p>
+							}
+						</div>
+						<div class="channel-row-actions">
+							<sl-button size="small" href={ "/channels/" + ch.ID + "/edit" }>
+								<sl-icon name="pencil"></sl-icon> Edit
+							</sl-button>
+							<a href={ templ.SafeURL("/channels/" + ch.Slug + "/feed.rss") } target="_blank">
+								<sl-button size="small" variant="neutral">
+									<sl-icon slot="prefix" name="rss"></sl-icon> RSS
+								</sl-button>
+							</a>
+							<form method="POST" action={ templ.SafeURL("/channels/" + ch.ID + "/delete") } style="display:inline"
+								onsubmit="return confirm('Delete this channel?')">
+								<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+								<sl-button size="small" variant="danger" type="submit">
+									<sl-icon name="trash"></sl-icon>
+								</sl-button>
+							</form>
+						</div>
+					</div>
+				</sl-card>
+			}
+		</div>
+	}
+}

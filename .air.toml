@@ -1,0 +1,21 @@
+[build]
+  cmd = "templ generate && go build -mod=mod -o ./tmp/laserfeed ./cmd/laserfeed"
+  bin = "./tmp/laserfeed"
+  full_bin = "./tmp/laserfeed"
+  include_ext = ["go", "templ"]
+  exclude_dir = ["tmp", "vendor"]
+  exclude_regex = ["_templ\\.go$"]
+  delay = 1000
+  kill_delay = "500ms"
+  rerun = false
+  log = "build-errors.log"
+
+[log]
+  time = false
+
+[color]
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  clean_on_exit = true

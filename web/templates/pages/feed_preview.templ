@@ -1,0 +1,100 @@
+package pages
+
+import (
+	"fmt"
+	"github.com/laserfeed/laserfeed/internal/domain/article"
+	"github.com/laserfeed/laserfeed/internal/domain/feed"
+	"github.com/laserfeed/laserfeed/internal/domain/filterrule"
+	"github.com/laserfeed/laserfeed/web/templates/layouts"
+)
+
+templ FeedPreview(csrfToken string, f *feed.Feed, articles []*article.Article, rules []*filterrule.FilterRule, showRaw bool) {
+	@layouts.Base("Preview: " + f.Name, csrfToken) {
+		<div class="page-header">
+			<div>
+				<h1>{ f.Name }</h1>
+				<span class="muted">{ f.URL }</span>
+			</div>
+			<div style="display:flex;gap:.5rem;align-items:center">
+				<sl-button href={ "/feeds/" + f.ID + "/rules" } size="small">
+					<sl-icon slot="prefix" name="funnel"></sl-icon> Rules ({ fmt.Sprintf("%d", len(rules)) })
+				</sl-button>
+				<form method="POST" action={ templ.SafeURL("/feeds/" + f.ID + "/refresh") } style="display:inline">
+					<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+					<sl-button size="small" variant="neutral" type="submit">
+						<sl-icon slot="prefix" name="arrow-clockwise"></sl-icon> Refresh
+					</sl-button>
+				</form>
+				<sl-button href="/feeds" size="small">Back</sl-button>
+			</div>
+		</div>
+
+		<div class="preview-mode-bar">
+			if showRaw {
+				<a href={ templ.SafeURL("/feeds/" + f.ID + "/preview") }>
+					<sl-button size="small" variant="neutral">
+						<sl-icon slot="prefix" name="funnel"></sl-icon> Show Filtered
+					</sl-button>
+				</a>
+				<sl-button size="small" variant="primary" disabled>
+					<sl-icon slot="prefix" name="eye"></sl-icon> Raw (all articles)
+				</sl-button>
+			} else {
+				<sl-button size="small" variant="primary" disabled>
+					<sl-icon slot="prefix" name="funnel"></sl-icon> Filtered
+				</sl-button>
+				<a href={ templ.SafeURL("/feeds/" + f.ID + "/preview?mode=raw") }>
+					<sl-button size="small" variant="neutral">
+						<sl-icon slot="prefix" name="eye"></sl-icon> Show Raw
+					</sl-button>
+				</a>
+			}
+			<span class="muted">{ fmt.Sprintf("%d articles", len(articles)) }</span>
+		</div>
+
+		if len(rules) > 0 && !showRaw {
+			<sl-details summary="Active filter rules" class="rules-summary">
+				for _, r := range rules {
+					<div class="rule-row">
+						<sl-badge variant={ ruleVariant(r.RuleType) }>{ string(r.RuleType) }</sl-badge>
+						<span>{ string(r.MatchField) }</span>
+						<code>{ r.MatchPattern }</code>
+					</div>
+				}
+			</sl-details>
+		}
+
+		<div class="preview-articles">
+			if len(articles) == 0 {
+				<sl-card>
+					<p class="muted">No articles yet. Try refreshing the feed.</p>
+				</sl-card>
+			}
+			for _, a := range articles {
+				@PreviewArticleRow(a, showRaw)
+			}
+		</div>
+	}
+}
+
+templ PreviewArticleRow(a *article.Article, showRaw bool) {
+	<sl-card class={ "preview-article", templ.KV("filtered-out", a.IsFilteredOut && showRaw) }>
+		<div class="preview-article-header">
+			<div class="preview-article-info">
+				if a.IsFilteredOut && showRaw {
+					<sl-badge variant="danger" title="Filtered out by rules">filtered</sl-badge>
+				}
+				<a href={ templ.SafeURL(a.URL) } target="_blank" rel="noopener" class="article-title">{ a.Title }</a>
+				if a.Author != "" {
+					<span class="muted">— { a.Author }</span>
+				}
+			</div>
+			<div style="display:flex;gap:.5rem;align-items:center;flex-shrink:0">
+				if a.ThumbnailURL != "" {
+					<img src={ a.ThumbnailURL } alt="" style="width:48px;height:48px;object-fit:cover;border-radius:4px"/>
+				}
+				<sl-relative-time date={ a.PublishedAt.UTC().Format("2006-01-02T15:04:05Z") } class="muted"></sl-relative-time>
+			</div>
+		</div>
+	</sl-card>
+}

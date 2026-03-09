@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS feeds;
+DROP TYPE IF EXISTS selector_type;
+DROP TYPE IF EXISTS image_mode;

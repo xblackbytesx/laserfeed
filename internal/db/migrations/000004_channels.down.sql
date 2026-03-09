@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS channel_feeds;
+DROP TABLE IF EXISTS channels;

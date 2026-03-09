@@ -1,0 +1,93 @@
+package pages
+
+import (
+	"strconv"
+	"github.com/laserfeed/laserfeed/internal/domain/feed"
+	"github.com/laserfeed/laserfeed/web/templates/layouts"
+)
+
+templ FeedEdit(csrfToken string, f *feed.Feed) {
+	@layouts.Base("Edit Feed", csrfToken) {
+		<div class="page-header">
+			<h1>Edit Feed</h1>
+			<sl-button href="/feeds" variant="neutral">
+				<sl-icon slot="prefix" name="arrow-left"></sl-icon> Back
+			</sl-button>
+		</div>
+		<sl-card>
+			<form method="POST" action={ templ.SafeURL("/feeds/" + f.ID + "/update") } class="edit-form">
+				<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+
+				<fieldset class="form-section">
+					<legend>Basic</legend>
+					<div class="form-grid-2">
+						<sl-input name="name" label="Name" value={ f.Name } required></sl-input>
+						<sl-input name="url" label="Feed URL" value={ f.URL } required type="url"></sl-input>
+					</div>
+					<div class="form-grid-2">
+						<sl-input name="poll_interval_seconds" label="Poll interval (seconds)" type="number"
+							value={ strconv.Itoa(f.PollIntervalSeconds) }></sl-input>
+						<sl-input name="user_agent" label="User-Agent override"
+							value={ derefStr(f.UserAgent) } placeholder="Leave blank to use global default"></sl-input>
+					</div>
+					<div class="form-switches">
+						<sl-switch name="enabled" value="true" checked?={ f.Enabled }>Enabled</sl-switch>
+					</div>
+				</fieldset>
+
+				<fieldset class="form-section">
+					<legend>Full-content scraping</legend>
+					<div class="form-switches">
+						<sl-switch name="scrape_full_content" value="true" checked?={ f.ScrapeFullContent }>
+							Scrape full article content
+						</sl-switch>
+					</div>
+					<div class="form-grid-2">
+						<sl-input name="scrape_selector" label="Content selector"
+							value={ derefStr(f.ScrapeSelector) }
+							placeholder="article.post-body  (leave blank for best-effort)"></sl-input>
+						<sl-select name="scrape_selector_type" label="Selector type" value={ string(f.ScrapeSelectorType) }>
+							<sl-option value="css">CSS</sl-option>
+							<sl-option value="xpath">XPath</sl-option>
+						</sl-select>
+					</div>
+				</fieldset>
+
+				<fieldset class="form-section">
+					<legend>Thumbnail</legend>
+					<p class="muted small" style="margin-bottom:.25rem">
+						LaserFeed always uses the feed's own <code>media:thumbnail</code>, <code>media:content</code>,
+						or enclosure image when available. The setting below is the <strong>fallback</strong> strategy
+						applied only when the feed provides no image at all.
+					</p>
+					<div class="form-grid-2">
+						<sl-select name="image_mode" label="Fallback image mode" value={ string(f.ImageMode) }>
+							<sl-option value="extract">Extract first &lt;img&gt; from content</sl-option>
+							<sl-option value="none">None — leave blank</sl-option>
+							<sl-option value="placeholder">Fixed placeholder URL</sl-option>
+							<sl-option value="random">Random identicon (per article)</sl-option>
+						</sl-select>
+						<sl-input name="placeholder_image_url" label="Placeholder image URL"
+							value={ derefStr(f.PlaceholderImageURL) }
+							placeholder="https://example.com/placeholder.png"></sl-input>
+					</div>
+				</fieldset>
+
+				<div class="form-actions">
+					<sl-button href="/feeds" variant="neutral">Cancel</sl-button>
+					<sl-button type="submit" variant="primary">
+						<sl-icon slot="prefix" name="check2"></sl-icon>
+						Save Changes
+					</sl-button>
+				</div>
+			</form>
+		</sl-card>
+	}
+}
+
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}

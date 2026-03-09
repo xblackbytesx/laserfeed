@@ -1,0 +1,82 @@
+package pages
+
+import (
+	"github.com/laserfeed/laserfeed/internal/domain/channel"
+	"github.com/laserfeed/laserfeed/internal/domain/feed"
+	"github.com/laserfeed/laserfeed/web/templates/layouts"
+)
+
+templ ChannelEdit(csrfToken string, ch *channel.Channel, channelFeeds []*feed.Feed, allFeeds []*feed.Feed) {
+	@layouts.Base("Edit Channel", csrfToken) {
+		<div class="page-header">
+			<h1>Edit Channel</h1>
+			<sl-button href="/channels" variant="neutral">
+				<sl-icon slot="prefix" name="arrow-left"></sl-icon> Back
+			</sl-button>
+		</div>
+		<div class="edit-grid">
+			<sl-card>
+				<div slot="header">Channel settings</div>
+				<form method="POST" action={ templ.SafeURL("/channels/" + ch.ID + "/update") } class="edit-form">
+					<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+					<sl-input name="name" label="Name" value={ ch.Name } required></sl-input>
+					<sl-input name="slug" label="URL slug" value={ ch.Slug } required
+						help-text={ "/channels/" + ch.Slug + "/feed.rss" }></sl-input>
+					<sl-textarea name="description" label="Description" value={ ch.Description } rows="3"></sl-textarea>
+					<div class="form-actions" style="margin-top:1rem">
+						<sl-button type="submit" variant="primary">
+							<sl-icon slot="prefix" name="check2"></sl-icon>
+							Save
+						</sl-button>
+					</div>
+				</form>
+			</sl-card>
+
+			<sl-card>
+				<div slot="header">Feed membership</div>
+				<div id="channel-feeds">
+					@ChannelFeedsList(csrfToken, ch.ID, channelFeeds)
+				</div>
+				<sl-divider></sl-divider>
+				<form
+					hx-post={ "/channels/" + ch.ID + "/feeds" }
+					hx-target="#channel-feeds"
+					hx-swap="innerHTML"
+					class="add-feed-form"
+				>
+					<sl-select name="feed_id" label="Add a feed" placeholder="Select feed…">
+						for _, f := range allFeeds {
+							<sl-option value={ f.ID }>{ f.Name }</sl-option>
+						}
+					</sl-select>
+					<sl-button type="submit" variant="primary">
+						<sl-icon slot="prefix" name="plus-circle"></sl-icon>
+						Add
+					</sl-button>
+				</form>
+			</sl-card>
+		</div>
+	}
+}
+
+templ ChannelFeedsList(csrfToken string, channelID string, feeds []*feed.Feed) {
+	if len(feeds) == 0 {
+		<p class="muted small" style="margin-bottom:.5rem">No feeds in this channel yet.</p>
+	}
+	for _, f := range feeds {
+		<div class="channel-feed-row">
+			<sl-icon name="rss" style="color:var(--color-muted)"></sl-icon>
+			<span>{ f.Name }</span>
+			<form
+				hx-post={ "/channels/" + channelID + "/feeds/" + f.ID + "/remove" }
+				hx-target="#channel-feeds"
+				hx-swap="innerHTML"
+				style="display:inline;margin-left:auto"
+			>
+				<sl-button size="small" variant="text" type="submit" title="Remove from channel">
+					<sl-icon name="x-lg"></sl-icon>
+				</sl-button>
+			</form>
+		</div>
+	}
+}

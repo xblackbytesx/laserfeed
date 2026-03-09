@@ -1,0 +1,44 @@
+package layouts
+
+templ Base(title string, csrfToken string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title } — LaserFeed</title>
+			<meta name="csrf-token" content={ csrfToken }/>
+			<link rel="stylesheet" href="/static/css/app.css"/>
+			<link rel="stylesheet" href="/static/vendor/shoelace/themes/dark.css"/>
+			<script type="module" src="/static/vendor/shoelace/shoelace-autoloader.js"></script>
+			<script src="/static/vendor/htmx.min.js" defer></script>
+		</head>
+		<body class="sl-theme-dark" hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` }>
+			<div class="app-layout">
+				@Sidebar()
+				<main class="app-main">
+					{ children... }
+				</main>
+			</div>
+			<script src="/static/js/app.js"></script>
+		</body>
+	</html>
+}
+
+templ Sidebar() {
+	<nav class="app-sidebar">
+		<div class="sidebar-logo">
+			<span class="logo-icon">⚡</span>
+			<span class="logo-text">LaserFeed</span>
+		</div>
+		<ul class="sidebar-nav">
+			<li><a href="/" class="nav-item"><sl-icon name="house"></sl-icon> Dashboard</a></li>
+			<li><a href="/feeds" class="nav-item"><sl-icon name="rss"></sl-icon> Feed Pool</a></li>
+			<li><a href="/channels" class="nav-item"><sl-icon name="collection"></sl-icon> Channels</a></li>
+			<li><a href="/settings" class="nav-item"><sl-icon name="gear"></sl-icon> Settings</a></li>
+		</ul>
+		<div class="sidebar-footer">
+			<a href="/feed.rss" class="nav-item" target="_blank"><sl-icon name="broadcast"></sl-icon> All Feeds RSS</a>
+		</div>
+	</nav>
+}

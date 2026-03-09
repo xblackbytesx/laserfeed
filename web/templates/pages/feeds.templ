@@ -1,0 +1,100 @@
+package pages
+
+import (
+	"github.com/laserfeed/laserfeed/internal/domain/feed"
+	"github.com/laserfeed/laserfeed/web/templates/layouts"
+)
+
+templ FeedList(csrfToken string, feeds []*feed.Feed) {
+	@layouts.Base("Feed Pool", csrfToken) {
+		<div class="page-header">
+			<h1>Feed Pool</h1>
+			<sl-button variant="primary" onclick="document.getElementById('add-feed-dialog').show()">
+				<sl-icon slot="prefix" name="plus-circle"></sl-icon>
+				Add Feed
+			</sl-button>
+		</div>
+		<sl-dialog label="Add Feed Source" id="add-feed-dialog">
+			<form method="POST" action="/feeds" class="dialog-form">
+				<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+				<sl-input name="name" label="Name" required placeholder="Hacker News"></sl-input>
+				<sl-input name="url" label="Feed URL" required type="url" placeholder="https://hnrss.org/frontpage"></sl-input>
+				<div class="form-row">
+					<sl-input name="poll_interval_seconds" label="Poll interval (s)" type="number" value="3600" style="flex:1"></sl-input>
+					<sl-select name="image_mode" label="Fallback image mode" value="extract"
+						help-text="Used only when the feed provides no media:thumbnail or enclosure image."
+						style="flex:1">
+						<sl-option value="extract">Extract first &lt;img&gt; from content</sl-option>
+						<sl-option value="none">None — leave blank</sl-option>
+						<sl-option value="placeholder">Fixed placeholder URL</sl-option>
+						<sl-option value="random">Random identicon (per article)</sl-option>
+					</sl-select>
+				</div>
+				<div class="dialog-footer">
+					<sl-button onclick="document.getElementById('add-feed-dialog').hide()" variant="neutral">Cancel</sl-button>
+					<sl-button type="submit" variant="primary">
+						<sl-icon slot="prefix" name="plus-circle"></sl-icon>
+						Add Feed
+					</sl-button>
+				</div>
+			</form>
+		</sl-dialog>
+		if len(feeds) == 0 {
+			<sl-card>
+				<div class="empty-state">
+					<sl-icon name="rss" style="font-size:2rem;color:var(--color-muted)"></sl-icon>
+					<p>No feeds yet. Add your first feed source above.</p>
+				</div>
+			</sl-card>
+		}
+		<div class="feed-list">
+			for _, f := range feeds {
+				@FeedRow(csrfToken, f)
+			}
+		</div>
+	}
+}
+
+templ FeedRow(csrfToken string, f *feed.Feed) {
+	<sl-card class="feed-row">
+		<div class="feed-row-header">
+			<div class="feed-row-info">
+				<strong>{ f.Name }</strong>
+				<span class="muted small">{ f.URL }</span>
+				if !f.Enabled {
+					<sl-badge variant="neutral">Disabled</sl-badge>
+				}
+				if f.LastError != nil && *f.LastError != "" {
+					<sl-badge variant="danger">Error</sl-badge>
+				}
+			</div>
+			<div class="feed-row-actions">
+				<sl-button size="small" href={ "/feeds/" + f.ID + "/preview" }>
+					<sl-icon name="eye"></sl-icon> Preview
+				</sl-button>
+				<sl-button size="small" href={ "/feeds/" + f.ID + "/rules" }>
+					<sl-icon name="funnel"></sl-icon> Rules
+				</sl-button>
+				<sl-button size="small" href={ "/feeds/" + f.ID + "/edit" }>
+					<sl-icon name="pencil"></sl-icon> Edit
+				</sl-button>
+				<form method="POST" action={ templ.SafeURL("/feeds/" + f.ID + "/refresh") } style="display:inline">
+					<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+					<sl-button size="small" type="submit" variant="neutral">
+						<sl-icon name="arrow-clockwise"></sl-icon>
+					</sl-button>
+				</form>
+				<form method="POST" action={ templ.SafeURL("/feeds/" + f.ID + "/delete") } style="display:inline"
+					onsubmit="return confirm('Delete this feed and all its articles?')">
+					<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+					<sl-button size="small" variant="danger" type="submit">
+						<sl-icon name="trash"></sl-icon>
+					</sl-button>
+				</form>
+			</div>
+		</div>
+		if f.LastError != nil && *f.LastError != "" {
+			<sl-alert variant="danger" open style="margin-top:.75rem">{ *f.LastError }</sl-alert>
+		}
+	</sl-card>
+}
