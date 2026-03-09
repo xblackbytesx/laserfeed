@@ -2,9 +2,6 @@
 laserfeed
 tmp/
 
-# Go
-go.sum
-
 # templ generated files
 *_templ.go
 
