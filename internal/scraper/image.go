@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -31,7 +32,7 @@ func ExtractThumbnail(item *gofeed.Item, descHTML, contentHTML, imageMode, place
 	case "placeholder":
 		return placeholderURL
 	case "random":
-		return fmt.Sprintf("https://api.dicebear.com/7.x/identicon/svg?seed=%s", guid)
+		return fmt.Sprintf("https://api.dicebear.com/7.x/identicon/svg?seed=%s", url.QueryEscape(guid))
 	case "extract":
 		if url := firstImgSrc(descHTML); url != "" {
 			return url

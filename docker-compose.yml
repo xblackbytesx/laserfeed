@@ -4,10 +4,11 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DATABASE_URL: postgres://laserfeed:laserfeed@db:5432/laserfeed?sslmode=disable
-      CSRF_AUTH_KEY: ${CSRF_AUTH_KEY:-changeme-32-chars-minimum-here!!}
+      DATABASE_URL: postgres://laserfeed:${DB_PASSWORD}@db:5432/laserfeed?sslmode=disable
+      CSRF_AUTH_KEY: ${CSRF_AUTH_KEY}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
       PORT: "8080"
+      SECURE_COOKIES: ${SECURE_COOKIES:-true}
     depends_on:
       db:
         condition: service_healthy
@@ -17,7 +18,7 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: laserfeed
-      POSTGRES_PASSWORD: laserfeed
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: laserfeed
     volumes:
       - pgdata:/var/lib/postgresql/data

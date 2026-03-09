@@ -36,8 +36,15 @@ func (s *SettingsStore) Get(ctx context.Context) (*settings.Settings, error) {
 		return nil, err
 	}
 
-	poll, _ := strconv.Atoi(m["poll_interval_seconds"])
-	max, _ := strconv.Atoi(m["max_articles_per_feed"])
+	poll, err := strconv.Atoi(m["poll_interval_seconds"])
+	if err != nil || poll < 60 {
+		poll = 3600
+	}
+	max, err := strconv.Atoi(m["max_articles_per_feed"])
+	if err != nil || max < 1 {
+		max = 500
+	}
+
 	return &settings.Settings{
 		UserAgent:           m["user_agent"],
 		PollIntervalSeconds: poll,

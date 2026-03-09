@@ -7,9 +7,10 @@ services:
       - "8080:8080"
     environment:
       DATABASE_URL: postgres://laserfeed:laserfeed@db:5432/laserfeed?sslmode=disable
-      CSRF_AUTH_KEY: dev-csrf-key-32-chars-minimum!!
+      CSRF_AUTH_KEY: dev-csrf-key-32-chars-minimum!!!
       APP_BASE_URL: http://localhost:8080
       PORT: "8080"
+      SECURE_COOKIES: "false"
     volumes:
       - .:/app
       # Anonymous volume shadows the bind-mount for the vendor directory so

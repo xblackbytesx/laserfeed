@@ -12,6 +12,13 @@ templ Base(title string, csrfToken string) {
 			<link rel="stylesheet" href="/static/vendor/shoelace/themes/dark.css"/>
 			<script type="module" src="/static/vendor/shoelace/shoelace-autoloader.js"></script>
 			<script src="/static/vendor/htmx.min.js" defer></script>
+			<!-- Preload icon SVGs present on every page (sidebar) so they are already
+			     in the fetch cache when sl-icon requests them, eliminating the blink. -->
+			<link rel="preload" href="/static/vendor/shoelace/assets/icons/house.svg" as="fetch" crossorigin="anonymous"/>
+			<link rel="preload" href="/static/vendor/shoelace/assets/icons/rss.svg" as="fetch" crossorigin="anonymous"/>
+			<link rel="preload" href="/static/vendor/shoelace/assets/icons/collection.svg" as="fetch" crossorigin="anonymous"/>
+			<link rel="preload" href="/static/vendor/shoelace/assets/icons/gear.svg" as="fetch" crossorigin="anonymous"/>
+			<link rel="preload" href="/static/vendor/shoelace/assets/icons/broadcast.svg" as="fetch" crossorigin="anonymous"/>
 		</head>
 		<body class="sl-theme-dark" hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` }>
 			<div class="app-layout">

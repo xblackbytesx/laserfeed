@@ -2,7 +2,9 @@ package poller
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -78,6 +80,86 @@ func (m *Manager) ForceRefresh(feedID string) {
 		default:
 		}
 	}
+}
+
+// ReScrapeArticles triggers a background re-scrape of all articles for the given feed.
+// Each article's URL is fetched and content is updated; scrape_status is set accordingly.
+// The feed must have scrape_full_content enabled or this is a no-op.
+func (m *Manager) ReScrapeArticles(feedID string) {
+	go func() {
+		ctx := m.rootCtx
+
+		f, err := m.stores.Feeds.GetByID(ctx, feedID)
+		if err != nil {
+			slog.Error("rescrape: get feed", "feed_id", feedID, "err", err)
+			return
+		}
+		if !f.ScrapeFullContent {
+			return
+		}
+
+		globalSettings, err := m.stores.Settings.Get(ctx)
+		if err != nil {
+			slog.Error("rescrape: get settings", "err", err)
+			return
+		}
+
+		userAgent := globalSettings.UserAgent
+		if f.UserAgent != nil && *f.UserAgent != "" {
+			userAgent = *f.UserAgent
+		}
+		selector := ""
+		if f.ScrapeSelector != nil {
+			selector = *f.ScrapeSelector
+		}
+		selectorType := string(f.ScrapeSelectorType)
+		cookies := ""
+		if f.ScrapeCookies != nil {
+			cookies = *f.ScrapeCookies
+		}
+
+		refs, err := m.stores.Articles.ListForReScrape(ctx, feedID)
+		if err != nil {
+			slog.Error("rescrape: list articles", "feed_id", feedID, "err", err)
+			return
+		}
+
+		slog.Info("rescrape: starting", "feed_id", feedID, "articles", len(refs))
+		success, failed := 0, 0
+		for _, ref := range refs {
+			select {
+			case <-ctx.Done():
+				slog.Info("rescrape: cancelled", "feed_id", feedID)
+				return
+			default:
+			}
+
+			scraped, err := m.scraper.ScrapeContent(ctx, ref.URL, userAgent, selector, selectorType, cookies)
+			var errMsg string
+			switch {
+			case err != nil:
+				errMsg = err.Error()
+			case strings.TrimSpace(scraped) == "":
+				if selector != "" {
+					errMsg = fmt.Sprintf("selector %q matched no content", selector)
+				} else {
+					errMsg = "no content could be extracted from the page"
+				}
+			}
+			if errMsg != "" {
+				if updateErr := m.stores.Articles.UpdateScrapeResult(ctx, ref.ID, "", errMsg); updateErr != nil {
+					slog.Error("rescrape: update failed status", "id", ref.ID, "err", updateErr)
+				}
+				failed++
+			} else {
+				if updateErr := m.stores.Articles.UpdateScrapeResult(ctx, ref.ID, scraped, ""); updateErr != nil {
+					slog.Error("rescrape: update success status", "id", ref.ID, "err", updateErr)
+				}
+				success++
+			}
+		}
+		slog.Info("rescrape: done", "feed_id", feedID, "success", success, "failed", failed)
+	}()
 }
 
 func (m *Manager) runFeedLoop(ctx context.Context, feedID string, refreshCh chan struct{}) {

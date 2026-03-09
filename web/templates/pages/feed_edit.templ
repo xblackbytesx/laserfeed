@@ -1,12 +1,14 @@
 package pages
 
 import (
+	"fmt"
 	"strconv"
+	"github.com/laserfeed/laserfeed/internal/domain/article"
 	"github.com/laserfeed/laserfeed/internal/domain/feed"
 	"github.com/laserfeed/laserfeed/web/templates/layouts"
 )
 
-templ FeedEdit(csrfToken string, f *feed.Feed) {
+templ FeedEdit(csrfToken string, f *feed.Feed, scrapeStats *article.ScrapeStats) {
 	@layouts.Base("Edit Feed", csrfToken) {
 		<div class="page-header">
 			<h1>Edit Feed</h1>
@@ -51,6 +53,13 @@ templ FeedEdit(csrfToken string, f *feed.Feed) {
 							<sl-option value="xpath">XPath</sl-option>
 						</sl-select>
 					</div>
+					<sl-textarea name="scrape_cookies" label="Cookie header" rows="2"
+						value={ derefStr(f.ScrapeCookies) }
+						placeholder="name=value; name2=value2"
+						help-text="Sent with every scrape request. Copy from browser DevTools → Network tab → select any request to the site → Request Headers → Cookie."></sl-textarea>
+				<sl-input name="scrape_max_age_days" label="Keep scraped content for (days)"
+						type="number" min="0" value={ strconv.Itoa(f.ScrapeMaxAgeDays) }
+						help-text="0 = keep forever. Older scraped content is cleared on each poll cycle."></sl-input>
 				</fieldset>
 
 				<fieldset class="form-section">
@@ -82,7 +91,49 @@ templ FeedEdit(csrfToken string, f *feed.Feed) {
 				</div>
 			</form>
 		</sl-card>
+
+		if f.ScrapeFullContent && scrapeStats != nil {
+			@ScrapeStatusCard(csrfToken, f, scrapeStats)
+		}
 	}
+}
+
+templ ScrapeStatusCard(csrfToken string, f *feed.Feed, s *article.ScrapeStats) {
+	<sl-card style="margin-top:1rem">
+		<div slot="header" style="display:flex;align-items:center;justify-content:space-between">
+			<span style="font-weight:600">Content Scraping Status</span>
+			<div style="display:flex;gap:.5rem">
+				<sl-badge variant="success">{ fmt.Sprintf("%d scraped", s.Success) }</sl-badge>
+				if s.Failed > 0 {
+					<sl-badge variant="danger">{ fmt.Sprintf("%d failed", s.Failed) }</sl-badge>
+				}
+				if s.None > 0 {
+					<sl-badge variant="neutral">{ fmt.Sprintf("%d not yet scraped", s.None) }</sl-badge>
+				}
+			</div>
+		</div>
+		<p class="muted small" style="margin-bottom:1rem">
+			Re-scraping fetches fresh full content for every article in this feed.
+			This runs in the background — refresh this page to see updated counts.
+			Purging clears stored content and resets status to "not scraped".
+		</p>
+		<div style="display:flex;gap:.75rem;flex-wrap:wrap">
+			<form method="POST" action={ templ.SafeURL("/feeds/" + f.ID + "/scrape") }>
+				<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+				<sl-button type="submit" variant="primary" size="small">
+					<sl-icon slot="prefix" name="arrow-repeat"></sl-icon>
+					Re-scrape All Articles
+				</sl-button>
+			</form>
+			<form method="POST" action={ templ.SafeURL("/feeds/" + f.ID + "/scrape/purge") }>
+				<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+				<sl-button type="submit" variant="danger" size="small" outline>
+					<sl-icon slot="prefix" name="trash"></sl-icon>
+					Purge Scraped Content
+				</sl-button>
+			</form>
+		</div>
+	</sl-card>
 }
 
 func derefStr(s *string) string {

@@ -1,5 +1,5 @@
 [build]
-  cmd = "templ generate && go build -mod=mod -o ./tmp/laserfeed ./cmd/laserfeed"
+  cmd = "templ generate && go build -mod=mod -buildvcs=false -o ./tmp/laserfeed ./cmd/laserfeed"
   bin = "./tmp/laserfeed"
   full_bin = "./tmp/laserfeed"
   include_ext = ["go", "templ"]

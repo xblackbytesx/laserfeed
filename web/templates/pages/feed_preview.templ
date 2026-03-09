@@ -9,7 +9,7 @@ import (
 )
 
 templ FeedPreview(csrfToken string, f *feed.Feed, articles []*article.Article, rules []*filterrule.FilterRule, showRaw bool) {
-	@layouts.Base("Preview: " + f.Name, csrfToken) {
+	@layouts.Base("Preview: "+f.Name, csrfToken) {
 		<div class="page-header">
 			<div>
 				<h1>{ f.Name }</h1>
@@ -25,7 +25,9 @@ templ FeedPreview(csrfToken string, f *feed.Feed, articles []*article.Article, r
 						<sl-icon slot="prefix" name="arrow-clockwise"></sl-icon> Refresh
 					</sl-button>
 				</form>
-				<sl-button href="/feeds" size="small">Back</sl-button>
+				<sl-button href={ "/feeds/" + f.ID + "/edit" } size="small">
+					<sl-icon slot="prefix" name="pencil"></sl-icon> Edit
+				</sl-button>
 			</div>
 		</div>
 
@@ -71,18 +73,21 @@ templ FeedPreview(csrfToken string, f *feed.Feed, articles []*article.Article, r
 				</sl-card>
 			}
 			for _, a := range articles {
-				@PreviewArticleRow(a, showRaw)
+				@PreviewArticleRow(a, f.ScrapeFullContent, showRaw)
 			}
 		</div>
 	}
 }
 
-templ PreviewArticleRow(a *article.Article, showRaw bool) {
+templ PreviewArticleRow(a *article.Article, scrapeEnabled bool, showRaw bool) {
 	<sl-card class={ "preview-article", templ.KV("filtered-out", a.IsFilteredOut && showRaw) }>
 		<div class="preview-article-header">
 			<div class="preview-article-info">
 				if a.IsFilteredOut && showRaw {
 					<sl-badge variant="danger" title="Filtered out by rules">filtered</sl-badge>
+				}
+				if scrapeEnabled {
+					@ScrapeStatusBadge(a)
 				}
 				<a href={ templ.SafeURL(a.URL) } target="_blank" rel="noopener" class="article-title">{ a.Title }</a>
 				if a.Author != "" {
@@ -96,5 +101,35 @@ templ PreviewArticleRow(a *article.Article, showRaw bool) {
 				<sl-relative-time date={ a.PublishedAt.UTC().Format("2006-01-02T15:04:05Z") } class="muted"></sl-relative-time>
 			</div>
 		</div>
+		if scrapeEnabled && a.ScrapeStatus == article.ScrapeStatusSuccess && a.Content != "" {
+			<sl-details summary="Scraped content" style="margin-top:.75rem">
+				<div class="scraped-content-preview">
+					@templ.Raw(a.Content)
+				</div>
+			</sl-details>
+		}
+		if scrapeEnabled && a.ScrapeStatus == article.ScrapeStatusFailed && a.ScrapeError != "" {
+			<sl-alert variant="danger" open style="margin-top:.75rem">
+				<sl-icon slot="icon" name="exclamation-triangle"></sl-icon>
+				<strong>Scrape failed:</strong> { a.ScrapeError }
+			</sl-alert>
+		}
 	</sl-card>
+}
+
+templ ScrapeStatusBadge(a *article.Article) {
+	switch a.ScrapeStatus {
+		case article.ScrapeStatusSuccess:
+			<sl-badge variant="success" title="Full content scraped successfully">
+				<sl-icon name="file-earmark-check"></sl-icon> scraped
+			</sl-badge>
+		case article.ScrapeStatusFailed:
+			<sl-badge variant="danger" title={ a.ScrapeError }>
+				<sl-icon name="exclamation-triangle"></sl-icon> failed
+			</sl-badge>
+		default:
+			<sl-badge variant="neutral">
+				<sl-icon name="file-earmark-minus"></sl-icon> not scraped
+			</sl-badge>
+	}
 }

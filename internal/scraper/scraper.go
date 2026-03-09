@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,10 +10,15 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/antchfx/htmlquery"
+	"github.com/microcosm-cc/bluemonday"
 	"github.com/mmcdole/gofeed"
 )
 
 const maxBodySize = 5 * 1024 * 1024 // 5MB
+
+// perScrapeTimeout is applied to each individual article fetch independently
+// of any outer poll timeout, so one slow page doesn't starve the rest.
+const perScrapeTimeout = 15 * time.Second
 
 var bestEffortSelectors = []string{
 	"article",
@@ -23,6 +29,22 @@ var bestEffortSelectors = []string{
 	"main",
 	"body",
 }
+
+// readerPolicy is a bluemonday policy that keeps semantic article content
+// while stripping scripts, ads, nav bars, inline styles, and other noise.
+var readerPolicy = func() *bluemonday.Policy {
+	p := bluemonday.UGCPolicy()
+	// UGC already allows: a, b/strong, i/em, br, hr, blockquote, pre, code,
+	// h1–h6, p, ul, ol, li, img, dl/dt/dd, table elements.
+	// Add structural/semantic block elements commonly found in article bodies.
+	p.AllowElements("div", "section", "article", "figure", "figcaption",
+		"time", "abbr", "address", "details", "summary", "mark", "small",
+		"sub", "sup", "caption", "aside")
+	p.AllowAttrs("datetime").OnElements("time")
+	p.AllowAttrs("title").OnElements("abbr")
+	p.AllowAttrs("open").OnElements("details")
+	return p
+}()
 
 type Scraper struct {
 	client *http.Client
@@ -35,8 +57,8 @@ func New() *Scraper {
 }
 
 // FetchFeed fetches and parses an RSS/Atom feed using a custom user agent.
-func (s *Scraper) FetchFeed(url, userAgent string) (*gofeed.Feed, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+func (s *Scraper) FetchFeed(ctx context.Context, url, userAgent string) (*gofeed.Feed, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -47,6 +69,10 @@ func (s *Scraper) FetchFeed(url, userAgent string) (*gofeed.Feed, error) {
 		return nil, fmt.Errorf("fetch feed: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("feed server returned %s", resp.Status)
+	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodySize))
 	if err != nil {
@@ -61,35 +87,53 @@ func (s *Scraper) FetchFeed(url, userAgent string) (*gofeed.Feed, error) {
 	return feed, nil
 }
 
-// ScrapeContent fetches a URL and extracts content using the given selector.
-func (s *Scraper) ScrapeContent(articleURL, userAgent, selector, selectorType string) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, articleURL, nil)
+// ScrapeContent fetches articleURL and extracts reader-view content using the
+// given selector. Each call creates its own 15-second deadline derived from ctx,
+// so a slow page cannot block an entire poll cycle.
+// cookies is an optional raw Cookie header value (e.g. "foo=bar; baz=qux").
+// The returned HTML is sanitized to clean reader-view content: headings,
+// paragraphs, lists, links, and images are kept; scripts, ads, and nav are stripped.
+func (s *Scraper) ScrapeContent(ctx context.Context, articleURL, userAgent, selector, selectorType, cookies string) (string, error) {
+	sctx, cancel := context.WithTimeout(ctx, perScrapeTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(sctx, http.MethodGet, articleURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("User-Agent", userAgent)
+	if cookies != "" {
+		req.Header.Set("Cookie", cookies)
+	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("fetch article: %w", err)
+		return "", fmt.Errorf("fetch page: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("page returned HTTP %s", resp.Status)
+	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodySize))
 	if err != nil {
 		return "", fmt.Errorf("read body: %w", err)
 	}
 
+	var raw string
 	if selector == "" {
-		return bestEffortExtract(string(body))
+		raw, err = bestEffortExtract(string(body))
+	} else if selectorType == "xpath" {
+		raw, err = extractXPath(string(body), selector)
+	} else {
+		raw, err = extractCSS(string(body), selector)
+	}
+	if err != nil {
+		return "", err
 	}
 
-	switch selectorType {
-	case "xpath":
-		return extractXPath(string(body), selector)
-	default:
-		return extractCSS(string(body), selector)
-	}
+	return readerPolicy.Sanitize(raw), nil
 }
 
 func extractCSS(body, selector string) (string, error) {
