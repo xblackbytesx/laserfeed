@@ -1,3 +1,5 @@
+![description](./assets/img/laserfeed-banner.png)
+
 # LaserFeed
 
 Self-hostable RSS/Atom feed aggregator. Add feed sources to a shared pool, configure per-feed content scraping, thumbnail policies, and keyword filters, then compose **Channels** that each produce their own Atom output. Point any RSS reader at a channel URL and get a clean, curated feed.
@@ -23,7 +25,7 @@ Self-hostable RSS/Atom feed aggregator. Add feed sources to a shared pool, confi
 **Requirements:** Docker and Docker Compose.
 
 ```bash
-git clone <repo>
+git clone https://github.com/xblackbytesx/laserfeed.git
 cd laserfeed
 make dev
 ```
@@ -51,7 +53,7 @@ The dev stack uses hardcoded throwaway values — no `.env` file needed:
 
 | Setting | Value |
 |---|---|
-| Database URL | `postgres://laserfeed:laserfeed@db:5432/laserfeed` |
+| Database URL | `postgres://laserfeed:laserfeed@laserfeed-db:5432/laserfeed` |
 | CSRF key | `dev-csrf-key-32-chars-minimum!!!` |
 | Secure cookies | `false` (HTTP only in dev) |
 

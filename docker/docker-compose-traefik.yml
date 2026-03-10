@@ -17,6 +17,7 @@ volumes:
 
 services:
   laserfeed-db:
+    container_name: laserfeed-db
     image: postgres:17-alpine
     security_opt:
       - no-new-privileges:true
@@ -57,13 +58,13 @@ services:
       - /etc/localtime:/etc/localtime:ro
     labels:
       - traefik.enable=true
-      - traefik.http.routers.laserfeed-secure.entrypoints=websecure
-      - traefik.http.routers.laserfeed-secure.rule=Host(`${SUBDOMAIN}.${DOMAIN}`)
-      - traefik.http.routers.laserfeed-secure.tls=true
-      - traefik.http.routers.laserfeed-secure.tls.certresolver=${CERT_RESOLVER}
-      - traefik.http.routers.laserfeed-secure.service=laserfeed
-      - traefik.http.routers.laserfeed-secure.middlewares=https-redirect@file,non-www@file,secure-headers@file,gzip-compress@file
-      - traefik.http.services.laserfeed.loadbalancer.server.port=8080
+      - traefik.http.routers.laserfeed-app-secure.entrypoints=websecure
+      - traefik.http.routers.laserfeed-app-secure.rule=Host(`${SUBDOMAIN}.${DOMAIN}`)
+      - traefik.http.routers.laserfeed-app-secure.tls=true
+      - traefik.http.routers.laserfeed-app-secure.tls.certresolver=${CERT_RESOLVER}
+      - traefik.http.routers.laserfeed-app-secure.service=laserfeed-app
+      - traefik.http.routers.laserfeed-app-secure.middlewares=https-redirect@file,non-www@file,secure-headers@file,gzip-compress@file
+      - traefik.http.services.laserfeed-app.loadbalancer.server.port=8080
     depends_on:
       laserfeed-db:
         condition: service_healthy

@@ -140,6 +140,7 @@ body {
   transition: background .15s;
 }
 .nav-item:hover { background: rgba(255,255,255,.06); }
+.nav-item.active { background: rgba(68,170,255,.12); color: var(--color-accent); }
 .nav-item sl-icon { font-size: 1rem; }
 
 .sidebar-footer {

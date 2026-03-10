@@ -1,3 +1,18 @@
+// Highlight the active sidebar nav link based on the current URL.
+// Runs on initial load and after every HTMX navigation.
+(function () {
+  function updateActiveNav() {
+    var path = location.pathname;
+    document.querySelectorAll('.sidebar-nav .nav-item').forEach(function (link) {
+      var href = link.getAttribute('href');
+      var active = href === '/' ? path === '/' : path.startsWith(href);
+      link.classList.toggle('active', active);
+    });
+  }
+  document.addEventListener('htmx:afterSettle', updateActiveNav);
+  updateActiveNav();
+})();
+
 // Auto-populate slug from channel name
 (function () {
   function toSlug(s) {

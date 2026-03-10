@@ -4,7 +4,6 @@ web/static/vendor/
 
 # Go build output
 tmp/
-laserfeed
 
 # Generated during Docker build — do not overwrite the freshly generated one
 go.sum
