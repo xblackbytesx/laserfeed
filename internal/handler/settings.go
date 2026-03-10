@@ -51,11 +51,23 @@ func (h *SettingsHandler) Post(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid image mode")
 	}
 
+	ua := c.FormValue("user_agent")
+	if len(ua) > 500 {
+		return echo.NewHTTPError(http.StatusBadRequest, "user agent must be 500 characters or fewer")
+	}
+
+	ph := c.FormValue("placeholder_image_url")
+	if ph != "" {
+		if err := validateFeedURL(ph); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid placeholder image URL")
+		}
+	}
+
 	pairs := map[string]string{
-		"user_agent":            c.FormValue("user_agent"),
+		"user_agent":            ua,
 		"poll_interval_seconds": strconv.Itoa(pollInterval),
 		"image_mode":            imageMode,
-		"placeholder_image_url": c.FormValue("placeholder_image_url"),
+		"placeholder_image_url": ph,
 		"max_articles_per_feed": strconv.Itoa(maxArticles),
 	}
 	if err := h.settings.SetAll(ctx, pairs); err != nil {

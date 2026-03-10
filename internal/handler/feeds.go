@@ -156,6 +156,9 @@ func (h *FeedHandler) Update(c echo.Context) error {
 		f.ScrapeSelector = nil
 	}
 	if ck := strings.TrimSpace(c.FormValue("scrape_cookies")); ck != "" {
+		if len(ck) > 8192 {
+			return echo.NewHTTPError(http.StatusBadRequest, "cookie header must be 8192 characters or fewer")
+		}
 		f.ScrapeCookies = &ck
 	} else {
 		f.ScrapeCookies = nil
@@ -212,13 +215,13 @@ func (h *FeedHandler) Preview(c echo.Context) error {
 	arts, err := h.articles.ListByFeedID(ctx, f.ID, showRaw, 100, 0)
 	if err != nil {
 		slog.Error("preview feed articles", "feed_id", f.ID, "err", err)
-		arts = nil
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load articles")
 	}
 
 	filterRules, err := h.rules.ListByFeedID(ctx, f.ID)
 	if err != nil {
 		slog.Error("preview feed rules", "feed_id", f.ID, "err", err)
-		filterRules = nil
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load filter rules")
 	}
 
 	return pages.FeedPreview(csrfToken(c), f, arts, filterRules, showRaw).Render(ctx, c.Response().Writer)

@@ -27,7 +27,7 @@ func (h *ChannelHandler) List(c echo.Context) error {
 	chans, err := h.channels.List(c.Request().Context())
 	if err != nil {
 		slog.Error("list channels", "err", err)
-		chans = nil
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channels")
 	}
 	return pages.ChannelList(csrfToken(c), chans).Render(c.Request().Context(), c.Response().Writer)
 }
@@ -54,12 +54,12 @@ func (h *ChannelHandler) Edit(c echo.Context) error {
 	channelFeeds, err := h.channels.ListFeeds(ctx, ch.ID)
 	if err != nil {
 		slog.Error("list channel feeds", "channel_id", ch.ID, "err", err)
-		channelFeeds = nil
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channel feeds")
 	}
 	allFeeds, err := h.feeds.List(ctx)
 	if err != nil {
 		slog.Error("list all feeds for channel edit", "err", err)
-		allFeeds = nil
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load feeds")
 	}
 	return pages.ChannelEdit(csrfToken(c), ch, channelFeeds, allFeeds).Render(ctx, c.Response().Writer)
 }
@@ -108,7 +108,7 @@ func (h *ChannelHandler) AddFeed(c echo.Context) error {
 	channelFeeds, err := h.channels.ListFeeds(ctx, channelID)
 	if err != nil {
 		slog.Error("list channel feeds after add", "channel_id", channelID, "err", err)
-		channelFeeds = nil
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channel feeds")
 	}
 	return pages.ChannelFeedsList(csrfToken(c), channelID, channelFeeds).Render(ctx, c.Response().Writer)
 }
@@ -126,7 +126,7 @@ func (h *ChannelHandler) RemoveFeed(c echo.Context) error {
 	channelFeeds, err := h.channels.ListFeeds(ctx, channelID)
 	if err != nil {
 		slog.Error("list channel feeds after remove", "channel_id", channelID, "err", err)
-		channelFeeds = nil
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channel feeds")
 	}
 	return pages.ChannelFeedsList(csrfToken(c), channelID, channelFeeds).Render(ctx, c.Response().Writer)
 }

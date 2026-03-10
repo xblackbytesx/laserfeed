@@ -2,6 +2,7 @@ package handler
 
 import (
 	"log/slog"
+	"net/http"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
@@ -31,13 +32,13 @@ func (h *DashboardHandler) Get(c echo.Context) error {
 	arts, err := h.articles.ListRecent(ctx, 20, offset)
 	if err != nil {
 		slog.Error("list recent articles", "err", err)
-		arts = nil
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load articles")
 	}
 
 	chans, err := h.channels.List(ctx)
 	if err != nil {
 		slog.Error("list channels for dashboard", "err", err)
-		chans = nil
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channels")
 	}
 
 	return pages.Dashboard(csrfToken(c), arts, chans, page).Render(ctx, c.Response().Writer)
