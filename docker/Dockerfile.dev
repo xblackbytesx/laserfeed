@@ -10,14 +10,14 @@ RUN go install github.com/air-verse/air@v1.61.5
 # Install front-end deps and copy assets into the image.
 # The docker-compose anonymous volume for web/static/vendor keeps these files
 # alive even when the host bind-mount shadows /app.
-COPY package.json ./
-RUN npm install && \
+COPY web/package.json ./web/
+RUN npm install --prefix ./web && \
     mkdir -p web/static/vendor/shoelace && \
-    cp -r node_modules/@shoelace-style/shoelace/cdn/. web/static/vendor/shoelace/ && \
+    cp -r web/node_modules/@shoelace-style/shoelace/cdn/. web/static/vendor/shoelace/ && \
     mkdir -p web/static/vendor && \
-    cp node_modules/htmx.org/dist/htmx.min.js web/static/vendor/htmx.min.js && \
-    rm -rf node_modules
+    cp web/node_modules/htmx.org/dist/htmx.min.js web/static/vendor/htmx.min.js && \
+    rm -rf web/node_modules
 
 EXPOSE 8080
 
-CMD ["air"]
+CMD ["air", "-c", "docker/.air.toml"]

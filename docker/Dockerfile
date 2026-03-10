@@ -5,12 +5,12 @@ RUN apk add --no-cache git nodejs npm
 WORKDIR /app
 
 # Front-end assets
-COPY package.json ./
-RUN npm install && \
+COPY web/package.json ./web/
+RUN npm install --prefix ./web && \
     mkdir -p web/static/vendor/shoelace && \
-    cp -r node_modules/@shoelace-style/shoelace/cdn/. web/static/vendor/shoelace/ && \
-    cp node_modules/htmx.org/dist/htmx.min.js web/static/vendor/htmx.min.js && \
-    rm -rf node_modules
+    cp -r web/node_modules/@shoelace-style/shoelace/cdn/. web/static/vendor/shoelace/ && \
+    cp web/node_modules/htmx.org/dist/htmx.min.js web/static/vendor/htmx.min.js && \
+    rm -rf web/node_modules
 
 # Download Go dependencies (cached layer — only re-runs when go.mod changes)
 COPY go.mod ./

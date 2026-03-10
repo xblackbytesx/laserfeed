@@ -1,27 +1,27 @@
 services:
-  app:
+  laserfeed-app:
     build:
-      context: .
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: docker/Dockerfile.dev
     ports:
       - "8080:8080"
     environment:
-      DATABASE_URL: postgres://laserfeed:laserfeed@db:5432/laserfeed?sslmode=disable
+      DATABASE_URL: postgres://laserfeed:laserfeed@laserfeed-db:5432/laserfeed?sslmode=disable
       CSRF_AUTH_KEY: dev-csrf-key-32-chars-minimum!!!
       APP_BASE_URL: http://localhost:8080
       PORT: "8080"
       SECURE_COOKIES: "false"
     volumes:
-      - .:/app
+      - ..:/app
       # Anonymous volume shadows the bind-mount for the vendor directory so
       # the Shoelace + HTMX files baked into the image during `docker build`
       # are never overwritten by the host bind-mount.
       - /app/web/static/vendor
     depends_on:
-      db:
+      laserfeed-db:
         condition: service_healthy
 
-  db:
+  laserfeed-db:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: laserfeed

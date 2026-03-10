@@ -7,7 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/laserfeed/laserfeed/internal/domain/article"
 	"github.com/laserfeed/laserfeed/internal/domain/channel"
-	"github.com/laserfeed/laserfeed/internal/feedout"
+	"github.com/laserfeed/laserfeed/internal/atom"
 )
 
 type FeedOutHandler struct {
@@ -46,7 +46,7 @@ func (h *FeedOutHandler) ChannelFeed(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load articles")
 	}
 
-	atomBytes, err := feedout.GenerateAtom(ch, arts, h.appBaseURL)
+	atomBytes, err := atom.GenerateAtom(ch, arts, h.appBaseURL)
 	if err != nil {
 		slog.Error("generate atom feed", "channel_id", ch.ID, "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to generate feed")
@@ -69,7 +69,7 @@ func (h *FeedOutHandler) AllFeed(c echo.Context) error {
 		Slug: "all",
 	}
 
-	atomBytes, err := feedout.GenerateAtom(allCh, arts, h.appBaseURL)
+	atomBytes, err := atom.GenerateAtom(allCh, arts, h.appBaseURL)
 	if err != nil {
 		slog.Error("generate all-feeds atom", "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to generate feed")

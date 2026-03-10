@@ -1,4 +1,4 @@
-package feedout
+package atom
 
 import (
 	"encoding/xml"
