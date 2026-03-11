@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -80,15 +81,25 @@ func main() {
 			h.Set("X-Content-Type-Options", "nosniff")
 			h.Set("X-Frame-Options", "DENY")
 			h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			if cfg.SecureCookies {
+				h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+			}
 			return next(c)
 		}
 	})
+
+	appURL, err := url.Parse(cfg.AppBaseURL)
+	if err != nil {
+		slog.Error("parse APP_BASE_URL", "err", err)
+		os.Exit(1)
+	}
 
 	csrfMiddleware := csrf.Protect(
 		[]byte(cfg.CSRFAuthKey),
 		csrf.Secure(cfg.SecureCookies),
 		csrf.RequestHeader("X-CSRF-Token"),
 		csrf.CookieName("csrf"),
+		csrf.TrustedOrigins([]string{appURL.Host}),
 	)
 	e.Use(echo.WrapMiddleware(csrfMiddleware))
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {

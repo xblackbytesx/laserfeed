@@ -194,6 +194,17 @@ body {
 
 .article-card {
   display: block;
+  height: 100%;
+}
+.article-card::part(base) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.article-card::part(body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .article-thumb {
@@ -202,9 +213,12 @@ body {
   object-fit: cover;
 }
 
-.article-content { padding: .5rem 0; }
+.article-content { padding: .5rem 0; flex: 1; }
 .article-title {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   color: var(--color-text);
   text-decoration: none;
   font-weight: 600;
@@ -288,6 +302,14 @@ body {
 .form-footer { margin-top: 1.5rem; }
 
 sl-card::part(body) { padding: 1rem; }
+
+sl-input::part(form-control-label),
+sl-select::part(form-control-label),
+sl-textarea::part(form-control-label),
+sl-checkbox::part(form-control-label),
+sl-radio-group::part(form-control-label) {
+  margin-bottom: 0.4rem;
+}
 
 .muted { color: var(--color-muted); font-size: .9rem; }
 

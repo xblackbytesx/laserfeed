@@ -89,7 +89,7 @@ templ PreviewArticleRow(a *article.Article, scrapeEnabled bool, showRaw bool) {
 				if scrapeEnabled {
 					@ScrapeStatusBadge(a)
 				}
-				<a href={ templ.SafeURL(a.URL) } target="_blank" rel="noopener" class="article-title">{ a.Title }</a>
+				<a href={ templ.URL(a.URL) } target="_blank" rel="noopener" class="article-title">{ a.Title }</a>
 				if a.Author != "" {
 					<span class="muted">— { a.Author }</span>
 				}

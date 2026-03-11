@@ -64,13 +64,14 @@ templ FeedEdit(csrfToken string, f *feed.Feed, scrapeStats *article.ScrapeStats)
 
 				<fieldset class="form-section">
 					<legend>Thumbnail</legend>
-					<p class="muted small" style="margin-bottom:.25rem">
-						LaserFeed always uses the feed's own <code>media:thumbnail</code>, <code>media:content</code>,
-						or enclosure image when available. The setting below is the <strong>fallback</strong> strategy
-						applied only when the feed provides no image at all.
-					</p>
 					<div class="form-grid-2">
-						<sl-select name="image_mode" label="Fallback image mode" value={ string(f.ImageMode) }>
+						<sl-select name="image_mode" value={ string(f.ImageMode) }>
+							<span slot="label">
+								Fallback image mode
+								<sl-tooltip content="LaserFeed always uses the feed&#39;s own media:thumbnail, media:content, or enclosure image when available. The setting below is the fallback strategy applied only when the feed provides no image at all.">
+									<sl-icon name="info-circle" style="font-size:.85em;vertical-align:middle;cursor:default;color:var(--color-muted);margin-left:.3rem"></sl-icon>
+								</sl-tooltip>
+							</span>
 							<sl-option value="extract">Extract first &lt;img&gt; from content</sl-option>
 							<sl-option value="none">None — leave blank</sl-option>
 							<sl-option value="placeholder">Fixed placeholder URL</sl-option>

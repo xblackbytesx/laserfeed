@@ -10,7 +10,7 @@ templ ArticleCard(a *article.Article) {
 			<img slot="image" src={ a.ThumbnailURL } alt="" class="article-thumb" loading="lazy"/>
 		}
 		<div class="article-content">
-			<a href={ templ.SafeURL(a.URL) } target="_blank" rel="noopener" class="article-title">{ a.Title }</a>
+			<a href={ templ.URL(a.URL) } target="_blank" rel="noopener" class="article-title">{ a.Title }</a>
 			if a.Author != "" {
 				<div class="article-meta">by { a.Author }</div>
 			}

@@ -46,6 +46,12 @@ var readerPolicy = func() *bluemonday.Policy {
 	return p
 }()
 
+// SanitizeHTML sanitizes untrusted HTML from RSS feeds using the reader policy,
+// stripping scripts, event handlers, and other dangerous content.
+func SanitizeHTML(html string) string {
+	return readerPolicy.Sanitize(html)
+}
+
 type Scraper struct {
 	client *http.Client
 }

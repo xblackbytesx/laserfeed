@@ -121,7 +121,7 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 				slog.Warn("poller: scrape content", "url", item.Link, "err", err)
 				scrapeStatus = article.ScrapeStatusFailed
 				scrapeError = err.Error()
-				content = item.Content
+				content = scraper.SanitizeHTML(item.Content)
 			case strings.TrimSpace(scraped) == "":
 				if sp.selector != "" {
 					scrapeError = fmt.Sprintf("selector %q matched no content", sp.selector)
@@ -130,7 +130,7 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 				}
 				slog.Warn("poller: scrape empty", "url", item.Link, "reason", scrapeError)
 				scrapeStatus = article.ScrapeStatusFailed
-				content = item.Content
+				content = scraper.SanitizeHTML(item.Content)
 			default:
 				scrapeStatus = article.ScrapeStatusSuccess
 				content = scraped
@@ -139,13 +139,13 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 			// Already successfully scraped — the upsert CASE WHEN will preserve
 			// the stored content; just carry the RSS content as a placeholder.
 			scrapeStatus = article.ScrapeStatusSuccess
-			content = item.Content
+			content = scraper.SanitizeHTML(item.Content)
 		} else {
 			scrapeStatus = article.ScrapeStatusNone
-			content = item.Content
+			content = scraper.SanitizeHTML(item.Content)
 		}
 
-		description := item.Description
+		description := scraper.SanitizeHTML(item.Description)
 		thumbnail := scraper.ExtractThumbnail(item, description, content, imageMode, placeholderURL, guid)
 
 

@@ -32,12 +32,18 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o laserfeed ./cmd/laserfeed
 
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata && \
+    addgroup -g 1000 laserfeed && \
+    adduser -u 1000 -G laserfeed -D -H laserfeed
 
 WORKDIR /app
 
 COPY --from=builder /app/laserfeed .
 COPY --from=builder /app/web/static ./web/static
+
+RUN chown -R laserfeed:laserfeed /app
+
+USER laserfeed
 
 EXPOSE 8080
 

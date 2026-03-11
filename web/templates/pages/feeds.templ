@@ -21,9 +21,13 @@ templ FeedList(csrfToken string, feeds []*feed.Feed) {
 				<sl-input name="url" label="Feed URL" required type="url" placeholder="https://hnrss.org/frontpage"></sl-input>
 				<div class="form-row">
 					<sl-input name="poll_interval_seconds" label="Poll interval (s)" type="number" value="3600" style="flex:1"></sl-input>
-					<sl-select name="image_mode" label="Fallback image mode" value="extract"
-						help-text="Used only when the feed provides no media:thumbnail or enclosure image."
-						style="flex:1">
+					<sl-select name="image_mode" value="extract" style="flex:1">
+						<span slot="label">
+							Fallback image mode
+							<sl-tooltip content="LaserFeed always uses the feed&#39;s own media:thumbnail, media:content, or enclosure image when available. The setting below is the fallback strategy applied only when the feed provides no image at all.">
+								<sl-icon name="info-circle" style="font-size:.85em;vertical-align:middle;cursor:default;color:var(--color-muted);margin-left:.3rem"></sl-icon>
+							</sl-tooltip>
+						</span>
 						<sl-option value="extract">Extract first &lt;img&gt; from content</sl-option>
 						<sl-option value="none">None — leave blank</sl-option>
 						<sl-option value="placeholder">Fixed placeholder URL</sl-option>
