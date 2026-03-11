@@ -3,11 +3,27 @@ package atom
 import (
 	"encoding/xml"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/laserfeed/laserfeed/internal/domain/article"
 	"github.com/laserfeed/laserfeed/internal/domain/channel"
 )
+
+// xmlSafe strips characters that are illegal in XML 1.0 documents.
+// Control characters other than tab (0x09), LF (0x0A), and CR (0x0D) are
+// not permitted in XML and will cause xml.Marshal to produce invalid output.
+var xmlIllegal = regexp.MustCompile(`[^\x09\x0A\x0D\x20-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]`)
+
+func xmlSafe(s string) string {
+	return xmlIllegal.ReplaceAllString(s, "")
+}
+
+// isAbsoluteURL reports whether s is an absolute http(s) URL.
+func isAbsoluteURL(s string) bool {
+	return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://")
+}
 
 type atomFeed struct {
 	XMLName xml.Name    `xml:"feed"`
@@ -17,6 +33,7 @@ type atomFeed struct {
 	ID      string      `xml:"id"`
 	Updated string      `xml:"updated"`
 	Link    []atomLink  `xml:"link"`
+	Author  *atomAuthor `xml:"author,omitempty"`
 	Entries []atomEntry `xml:"entry"`
 }
 
@@ -59,40 +76,43 @@ func GenerateAtom(ch *channel.Channel, articles []*article.Article, appBaseURL s
 	feed := atomFeed{
 		XMLNS:   "http://www.w3.org/2005/Atom",
 		MediaNS: "http://search.yahoo.com/mrss/",
-		Title:   ch.Name,
+		Title:   xmlSafe(ch.Name),
 		ID:      channelURL,
 		Updated: now,
 		Link: []atomLink{
 			{Href: selfURL, Rel: "self", Type: "application/atom+xml"},
 			{Href: channelURL, Rel: "alternate"},
 		},
+		Author: &atomAuthor{Name: "LaserFeed"},
 	}
 
 	for _, a := range articles {
 		// Prefer GUID as the stable Atom entry ID; fall back to URL.
+		// Atom requires the id to be a full IRI — bare GUIDs like "article-123"
+		// are invalid, so use the URL in that case.
 		entryID := a.GUID
-		if entryID == "" {
+		if entryID == "" || !isAbsoluteURL(entryID) {
 			entryID = a.URL
 		}
 
 		entry := atomEntry{
-			Title:     a.Title,
-			ID:        entryID,
+			Title:     xmlSafe(a.Title),
+			ID:        xmlSafe(entryID),
 			Updated:   a.PublishedAt.UTC().Format(time.RFC3339),
 			Published: a.PublishedAt.UTC().Format(time.RFC3339),
-			Link:      atomLink{Href: a.URL, Rel: "alternate"},
+			Link:      atomLink{Href: xmlSafe(a.URL), Rel: "alternate"},
 		}
 		if a.Author != "" {
-			entry.Author = &atomAuthor{Name: a.Author}
+			entry.Author = &atomAuthor{Name: xmlSafe(a.Author)}
 		}
 		if a.Description != "" {
-			entry.Summary = &atomText{Type: "html", Value: a.Description}
+			entry.Summary = &atomText{Type: "html", Value: xmlSafe(a.Description)}
 		}
 		if a.Content != "" {
-			entry.Content = &atomText{Type: "html", Value: a.Content}
+			entry.Content = &atomText{Type: "html", Value: xmlSafe(a.Content)}
 		}
 		if a.ThumbnailURL != "" {
-			entry.Thumbnail = &mediaThumbnail{URL: a.ThumbnailURL}
+			entry.Thumbnail = &mediaThumbnail{URL: xmlSafe(a.ThumbnailURL)}
 		}
 		feed.Entries = append(feed.Entries, entry)
 	}
