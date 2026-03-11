@@ -65,7 +65,7 @@ func main() {
 	feedHandler := handler.NewFeedHandler(feedStore, articleStore, filterRuleStore, pollerManager)
 	rulesHandler := handler.NewRulesHandler(feedStore, filterRuleStore)
 	channelHandler := handler.NewChannelHandler(channelStore, feedStore)
-	settingsHandler := handler.NewSettingsHandler(settingsStore)
+	settingsHandler := handler.NewSettingsHandler(settingsStore, feedStore, filterRuleStore, channelStore)
 	feedOutHandler := handler.NewFeedOutHandler(channelStore, articleStore, cfg.AppBaseURL)
 
 	e := echo.New()
@@ -151,6 +151,8 @@ func main() {
 	// Settings
 	e.GET("/settings", settingsHandler.Get)
 	e.POST("/settings", settingsHandler.Post)
+	e.GET("/settings/export", settingsHandler.Export)
+	e.POST("/settings/import", settingsHandler.Import)
 
 	go func() {
 		sig := make(chan os.Signal, 1)

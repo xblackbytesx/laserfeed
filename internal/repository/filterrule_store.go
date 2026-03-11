@@ -73,3 +73,11 @@ func (s *FilterRuleStore) Delete(ctx context.Context, feedID, ruleID string) err
 	}
 	return nil
 }
+
+func (s *FilterRuleStore) DeleteAllByFeedID(ctx context.Context, feedID string) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM feed_filter_rules WHERE feed_id=$1`, feedID)
+	if err != nil {
+		return fmt.Errorf("delete all filter rules: %w", err)
+	}
+	return nil
+}
