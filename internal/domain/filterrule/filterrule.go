@@ -35,4 +35,6 @@ type Repository interface {
 	ListByFeedID(ctx context.Context, feedID string) ([]*FilterRule, error)
 	// Delete removes a rule only if it belongs to the specified feed.
 	Delete(ctx context.Context, feedID, ruleID string) error
+	// DeleteAllByFeedID removes all rules for a feed (used during import).
+	DeleteAllByFeedID(ctx context.Context, feedID string) error
 }

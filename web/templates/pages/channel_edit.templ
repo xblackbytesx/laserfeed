@@ -42,6 +42,7 @@ templ ChannelEdit(csrfToken string, ch *channel.Channel, channelFeeds []*feed.Fe
 					hx-post={ "/channels/" + ch.ID + "/feeds" }
 					hx-target="#channel-feeds"
 					hx-swap="innerHTML"
+					hx-select="unset"
 					class="add-feed-form"
 				>
 					<sl-select name="feed_id" label="Add a feed" placeholder="Select feed…">
@@ -71,6 +72,7 @@ templ ChannelFeedsList(csrfToken string, channelID string, feeds []*feed.Feed) {
 				hx-post={ "/channels/" + channelID + "/feeds/" + f.ID + "/remove" }
 				hx-target="#channel-feeds"
 				hx-swap="innerHTML"
+				hx-select="unset"
 				style="display:inline;margin-left:auto"
 			>
 				<sl-button size="small" variant="text" type="submit" title="Remove from channel">

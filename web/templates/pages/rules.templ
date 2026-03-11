@@ -18,6 +18,7 @@ templ RulesPage(csrfToken string, f *feed.Feed, rules []*filterrule.FilterRule) 
 				hx-post={ "/feeds/" + f.ID + "/rules" }
 				hx-target="#rules-list"
 				hx-swap="innerHTML"
+				hx-select="unset"
 				hx-on::after-request="this.reset()"
 			>
 				<div class="form-row">
@@ -58,6 +59,7 @@ templ RulesList(csrfToken string, feedID string, rules []*filterrule.FilterRule)
 				hx-post={ "/feeds/" + feedID + "/rules/" + r.ID + "/delete" }
 				hx-target="#rules-list"
 				hx-swap="innerHTML"
+				hx-select="unset"
 				style="display:inline"
 			>
 				<sl-button size="small" variant="danger" type="submit">

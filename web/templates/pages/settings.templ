@@ -50,5 +50,44 @@ templ SettingsPage(csrfToken string, s *settings.Settings) {
 				</div>
 			</form>
 		</sl-card>
+
+		<hr style="max-width:640px;margin:1.5rem 0"/>
+
+		<sl-card style="max-width:640px">
+			<div style="display:flex;flex-direction:column;gap:1.25rem">
+				<div>
+					<div style="font-weight:600;margin-bottom:.25rem">Backup &amp; Restore</div>
+					<p class="muted small">
+						Export all feeds (including filter rules) and channels to a JSON file.
+						Importing merges into existing data: feeds are matched by URL, channels by slug.
+						Filter rules are fully replaced on import. Articles are not included.
+					</p>
+				</div>
+
+				<div>
+					<div class="muted small" style="margin-bottom:.5rem;font-weight:500">Export</div>
+					<a href="/settings/export" hx-boost="false">
+						<sl-button variant="neutral" size="small">
+							<sl-icon slot="prefix" name="download"></sl-icon>
+							Download backup JSON
+						</sl-button>
+					</a>
+				</div>
+
+				<div>
+					<div class="muted small" style="margin-bottom:.5rem;font-weight:500">Import</div>
+					<form method="POST" action="/settings/import" enctype="multipart/form-data"
+						style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap">
+						<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+						<input type="file" name="backup_file" accept=".json" required
+							style="flex:1;min-width:200px;color:var(--color-text);font-size:.875rem"/>
+						<sl-button type="submit" variant="neutral" size="small">
+							<sl-icon slot="prefix" name="upload"></sl-icon>
+							Import
+						</sl-button>
+					</form>
+				</div>
+			</div>
+		</sl-card>
 	}
 }

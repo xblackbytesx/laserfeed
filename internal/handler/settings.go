@@ -6,16 +6,27 @@ import (
 	"strconv"
 
 	"github.com/labstack/echo/v4"
+	"github.com/laserfeed/laserfeed/internal/domain/channel"
+	"github.com/laserfeed/laserfeed/internal/domain/feed"
+	"github.com/laserfeed/laserfeed/internal/domain/filterrule"
 	"github.com/laserfeed/laserfeed/internal/domain/settings"
 	"github.com/laserfeed/laserfeed/web/templates/pages"
 )
 
 type SettingsHandler struct {
-	settings settings.Repository
+	settings    settings.Repository
+	feeds       feed.Repository
+	filterRules filterrule.Repository
+	channels    channel.Repository
 }
 
-func NewSettingsHandler(s settings.Repository) *SettingsHandler {
-	return &SettingsHandler{settings: s}
+func NewSettingsHandler(
+	s settings.Repository,
+	f feed.Repository,
+	fr filterrule.Repository,
+	ch channel.Repository,
+) *SettingsHandler {
+	return &SettingsHandler{settings: s, feeds: f, filterRules: fr, channels: ch}
 }
 
 func (h *SettingsHandler) Get(c echo.Context) error {
