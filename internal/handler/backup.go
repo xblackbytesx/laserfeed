@@ -14,7 +14,6 @@ import (
 	"github.com/laserfeed/laserfeed/internal/domain/filterrule"
 )
 
-// backupDoc is the top-level JSON export format.
 type backupDoc struct {
 	Version    int             `json:"version"`
 	ExportedAt string          `json:"exported_at"`
@@ -135,10 +134,7 @@ func (h *SettingsHandler) Export(c echo.Context) error {
 	return nil
 }
 
-// Import reads a previously exported JSON file and upserts feeds and channels.
-// Existing feeds (matched by URL) have their config updated and their filter
-// rules replaced. Existing channels (matched by slug) have their metadata
-// updated and their feed memberships replaced.
+// Import upserts feeds (matched by URL) and channels (matched by slug) from a backup file.
 func (h *SettingsHandler) Import(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -169,7 +165,7 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("unsupported backup version %d", doc.Version))
 	}
 
-	// Build a URL→feed map from existing feeds so we can upsert by URL.
+	// Build URL→feed and URL→id maps for upsert and channel membership.
 	existingFeeds, err := h.feeds.List(ctx)
 	if err != nil {
 		slog.Error("import: list feeds", "err", err)
@@ -180,7 +176,6 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 		feedByURL[f.URL] = f
 	}
 
-	// url→id map built as we import, used later for channel membership.
 	importedFeedID := make(map[string]string)
 
 	for _, bf := range doc.Feeds {
@@ -191,7 +186,6 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 		var feedID string
 
 		if existing, ok := feedByURL[bf.URL]; ok {
-			// Update config of existing feed.
 			existing.Name = bf.Name
 			existing.Enabled = bf.Enabled
 			existing.PollIntervalSeconds = bf.PollIntervalSeconds
@@ -210,7 +204,6 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 			}
 			feedID = existing.ID
 		} else {
-			// Create new feed.
 			selectorType := feed.SelectorType(bf.ScrapeSelectorType)
 			if selectorType == "" {
 				selectorType = feed.SelectorTypeCSS
@@ -243,7 +236,6 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 
 		importedFeedID[bf.URL] = feedID
 
-		// Replace filter rules.
 		if err := h.filterRules.DeleteAllByFeedID(ctx, feedID); err != nil {
 			slog.Error("import: delete rules", "feed_id", feedID, "err", err)
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to replace filter rules")
@@ -262,7 +254,6 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 		}
 	}
 
-	// Build a slug→channel map for upsert.
 	existingChannels, err := h.channels.List(ctx)
 	if err != nil {
 		slog.Error("import: list channels", "err", err)
@@ -301,7 +292,6 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 			channelID = created.ID
 		}
 
-		// Replace feed memberships: remove all, re-add from backup.
 		currentFeeds, err := h.channels.ListFeeds(ctx, channelID)
 		if err != nil {
 			slog.Error("import: list channel feeds", "channel_id", channelID, "err", err)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/laserfeed/laserfeed/internal/domain/article"
 	"github.com/laserfeed/laserfeed/internal/domain/channel"
+	"github.com/laserfeed/laserfeed/internal/domain/feed"
 )
 
 // xmlSafe strips characters that are illegal in XML 1.0 documents.
@@ -50,9 +51,17 @@ type atomEntry struct {
 	Published string          `xml:"published"`
 	Link      atomLink        `xml:"link"`
 	Author    *atomAuthor     `xml:"author,omitempty"`
+	Source    *atomSource     `xml:"source,omitempty"`
 	Summary   *atomText       `xml:"summary,omitempty"`
 	Content   *atomText       `xml:"content,omitempty"`
 	Thumbnail *mediaThumbnail `xml:"media:thumbnail,omitempty"`
+}
+
+// atomSource identifies the origin feed for an aggregated entry (RFC 4287 §4.2.11).
+type atomSource struct {
+	ID    string     `xml:"id"`
+	Title string     `xml:"title"`
+	Link  []atomLink `xml:"link"`
 }
 
 type atomAuthor struct {
@@ -68,7 +77,7 @@ type mediaThumbnail struct {
 	URL string `xml:"url,attr"`
 }
 
-func GenerateAtom(ch *channel.Channel, articles []*article.Article, appBaseURL string) ([]byte, error) {
+func GenerateAtom(ch *channel.Channel, articles []*article.Article, feedsByID map[string]*feed.Feed, appBaseURL string) ([]byte, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	selfURL := fmt.Sprintf("%s/channels/%s/feed.rss", appBaseURL, ch.Slug)
 	channelURL := fmt.Sprintf("%s/channels/%s", appBaseURL, ch.Slug)
@@ -104,6 +113,13 @@ func GenerateAtom(ch *channel.Channel, articles []*article.Article, appBaseURL s
 		}
 		if a.Author != "" {
 			entry.Author = &atomAuthor{Name: xmlSafe(a.Author)}
+		}
+		if src, ok := feedsByID[a.FeedID]; ok {
+			entry.Source = &atomSource{
+				ID:    xmlSafe(src.URL),
+				Title: xmlSafe(src.Name),
+				Link:  []atomLink{{Href: xmlSafe(src.URL), Rel: "self", Type: "application/rss+xml"}},
+			}
 		}
 		if a.Description != "" {
 			entry.Summary = &atomText{Type: "html", Value: xmlSafe(a.Description)}

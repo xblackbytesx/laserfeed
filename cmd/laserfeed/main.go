@@ -66,7 +66,7 @@ func main() {
 	rulesHandler := handler.NewRulesHandler(feedStore, filterRuleStore)
 	channelHandler := handler.NewChannelHandler(channelStore, feedStore)
 	settingsHandler := handler.NewSettingsHandler(settingsStore, feedStore, filterRuleStore, channelStore)
-	feedOutHandler := handler.NewFeedOutHandler(channelStore, articleStore, cfg.AppBaseURL)
+	feedOutHandler := handler.NewFeedOutHandler(channelStore, articleStore, feedStore, cfg.AppBaseURL)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -74,7 +74,6 @@ func main() {
 	e.Use(appmiddleware.Logger())
 	e.Use(appmiddleware.HXTitle())
 
-	// Security headers on every response
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			h := c.Response().Header()
@@ -116,10 +115,8 @@ func main() {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	// Dashboard
 	e.GET("/", dashHandler.Get)
 
-	// Feed pool
 	e.GET("/feeds", feedHandler.List)
 	e.POST("/feeds", feedHandler.Create)
 	e.GET("/feeds/:id/edit", feedHandler.Edit)
@@ -130,12 +127,10 @@ func main() {
 	e.POST("/feeds/:id/scrape", feedHandler.Scrape)
 	e.POST("/feeds/:id/scrape/purge", feedHandler.PurgeScrape)
 
-	// Filter rules
 	e.GET("/feeds/:id/rules", rulesHandler.List)
 	e.POST("/feeds/:id/rules", rulesHandler.Create)
 	e.POST("/feeds/:id/rules/:rid/delete", rulesHandler.Delete)
 
-	// Channels
 	e.GET("/channels", channelHandler.List)
 	e.POST("/channels", channelHandler.Create)
 	e.GET("/channels/:id/edit", channelHandler.Edit)
@@ -144,11 +139,10 @@ func main() {
 	e.POST("/channels/:id/feeds", channelHandler.AddFeed)
 	e.POST("/channels/:id/feeds/:fid/remove", channelHandler.RemoveFeed)
 
-	// Feed outputs (no CSRF needed for RSS consumers)
+	// RSS outputs — no CSRF needed for feed consumers
 	e.GET("/channels/:slug/feed.rss", feedOutHandler.ChannelFeed)
 	e.GET("/feed.rss", feedOutHandler.AllFeed)
 
-	// Settings
 	e.GET("/settings", settingsHandler.Get)
 	e.POST("/settings", settingsHandler.Post)
 	e.GET("/settings/export", settingsHandler.Export)

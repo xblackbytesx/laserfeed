@@ -34,9 +34,7 @@ var bestEffortSelectors = []string{
 // while stripping scripts, ads, nav bars, inline styles, and other noise.
 var readerPolicy = func() *bluemonday.Policy {
 	p := bluemonday.UGCPolicy()
-	// UGC already allows: a, b/strong, i/em, br, hr, blockquote, pre, code,
-	// h1–h6, p, ul, ol, li, img, dl/dt/dd, table elements.
-	// Add structural/semantic block elements commonly found in article bodies.
+	// Extend UGC policy with structural/semantic elements found in article bodies.
 	p.AllowElements("div", "section", "article", "figure", "figcaption",
 		"time", "abbr", "address", "details", "summary", "mark", "small",
 		"sub", "sup", "caption", "aside")
@@ -62,7 +60,6 @@ func New() *Scraper {
 	}
 }
 
-// FetchFeed fetches and parses an RSS/Atom feed using a custom user agent.
 func (s *Scraper) FetchFeed(ctx context.Context, url, userAgent string) (*gofeed.Feed, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -93,12 +90,9 @@ func (s *Scraper) FetchFeed(ctx context.Context, url, userAgent string) (*gofeed
 	return feed, nil
 }
 
-// ScrapeContent fetches articleURL and extracts reader-view content using the
-// given selector. Each call creates its own 15-second deadline derived from ctx,
-// so a slow page cannot block an entire poll cycle.
+// ScrapeContent fetches articleURL and extracts reader-view HTML. Each call has its
+// own 15-second deadline so a slow page cannot stall an entire poll cycle.
 // cookies is an optional raw Cookie header value (e.g. "foo=bar; baz=qux").
-// The returned HTML is sanitized to clean reader-view content: headings,
-// paragraphs, lists, links, and images are kept; scripts, ads, and nav are stripped.
 func (s *Scraper) ScrapeContent(ctx context.Context, articleURL, userAgent, selector, selectorType, cookies string) (string, error) {
 	sctx, cancel := context.WithTimeout(ctx, perScrapeTimeout)
 	defer cancel()
