@@ -82,9 +82,7 @@ func (m *Manager) ForceRefresh(feedID string) {
 	}
 }
 
-// ReScrapeArticles triggers a background re-scrape of all articles for the given feed.
-// Each article's URL is fetched and content is updated; scrape_status is set accordingly.
-// The feed must have scrape_full_content enabled or this is a no-op.
+// ReScrapeArticles re-fetches content for all articles in a feed in the background.
 func (m *Manager) ReScrapeArticles(feedID string) {
 	go func() {
 		ctx := m.rootCtx

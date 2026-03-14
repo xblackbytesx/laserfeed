@@ -20,12 +20,10 @@ import (
 //     "random"      → DiceBear identicon seeded by article GUID
 //     "extract"     → first <img> found in description then content HTML
 func ExtractThumbnail(item *gofeed.Item, descHTML, contentHTML, imageMode, placeholderURL, guid string) string {
-	// Step 1: always prefer officially-provided feed media.
 	if mediaURL := extractFeedMedia(item); mediaURL != "" {
 		return mediaURL
 	}
 
-	// Step 2: nothing in the feed — apply the configured fallback strategy.
 	switch imageMode {
 	case "none":
 		return ""
@@ -43,14 +41,11 @@ func ExtractThumbnail(item *gofeed.Item, descHTML, contentHTML, imageMode, place
 	}
 }
 
-// extractFeedMedia checks gofeed-standard fields and common media extensions.
 func extractFeedMedia(item *gofeed.Item) string {
-	// gofeed unified Image field (covers <image> and some media tags)
 	if item.Image != nil && item.Image.URL != "" {
 		return item.Image.URL
 	}
 
-	// media:thumbnail and media:content namespace extensions
 	if ext, ok := item.Extensions["media"]; ok {
 		if thumbnails, ok := ext["thumbnail"]; ok && len(thumbnails) > 0 {
 			if url := thumbnails[0].Attrs["url"]; url != "" {
@@ -64,7 +59,6 @@ func extractFeedMedia(item *gofeed.Item) string {
 		}
 	}
 
-	// RSS enclosure with an image MIME type
 	for _, enc := range item.Enclosures {
 		if strings.HasPrefix(enc.Type, "image/") && enc.URL != "" {
 			return enc.URL

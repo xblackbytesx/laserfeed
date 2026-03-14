@@ -252,7 +252,6 @@ func (h *FeedHandler) PurgeScrape(c echo.Context) error {
 	return redirect(c, "/feeds/"+id+"/edit")
 }
 
-// validateFeedURL checks that a URL is non-empty, not too long, and uses http or https.
 func validateFeedURL(rawURL string) error {
 	if rawURL == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "URL is required")

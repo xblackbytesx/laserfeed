@@ -31,7 +31,6 @@ type Article struct {
 	ScrapeError   string
 }
 
-// ScrapeStats holds aggregate scrape result counts for a feed.
 type ScrapeStats struct {
 	Success int
 	Failed  int
@@ -51,7 +50,6 @@ type Repository interface {
 	ListRecent(ctx context.Context, limit, offset int) ([]*Article, error)
 	DeleteOldest(ctx context.Context, feedID string, keepCount int) error
 
-	// Scrape tracking
 	UpdateScrapeResult(ctx context.Context, id, content, errMsg string) error
 	GetScrapeStats(ctx context.Context, feedID string) (*ScrapeStats, error)
 	GetScrapedGUIDs(ctx context.Context, feedID string) (map[string]bool, error)

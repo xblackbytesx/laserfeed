@@ -136,8 +136,7 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 				content = scraped
 			}
 		} else if scrapedGUIDs[guid] {
-			// Already successfully scraped — the upsert CASE WHEN will preserve
-			// the stored content; just carry the RSS content as a placeholder.
+			// Already scraped — upsert preserves the stored content.
 			scrapeStatus = article.ScrapeStatusSuccess
 			content = scraper.SanitizeHTML(item.Content)
 		} else {
@@ -180,14 +179,12 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		}
 	}
 
-	// Enforce per-feed scrape content retention
 	if f.ScrapeFullContent && f.ScrapeMaxAgeDays > 0 {
 		if err := stores.Articles.PurgeOldScrapeContent(ctx, feedID, f.ScrapeMaxAgeDays); err != nil {
 			slog.Warn("poller: purge old scrape content", "feed_id", feedID, "err", err)
 		}
 	}
 
-	// Trim old articles
 	if globalSettings.MaxArticlesPerFeed > 0 {
 		if err := stores.Articles.DeleteOldest(ctx, feedID, globalSettings.MaxArticlesPerFeed); err != nil {
 			slog.Warn("poller: delete oldest", "feed_id", feedID, "err", err)
