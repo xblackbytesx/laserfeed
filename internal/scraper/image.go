@@ -30,7 +30,7 @@ func ExtractThumbnail(item *gofeed.Item, descHTML, contentHTML, imageMode, place
 	case "placeholder":
 		return placeholderURL
 	case "random":
-		return fmt.Sprintf("https://api.dicebear.com/7.x/identicon/svg?seed=%s", url.QueryEscape(guid))
+		return fmt.Sprintf("https://api.dicebear.com/9.x/identicon/svg?seed=%s", url.QueryEscape(guid))
 	case "extract":
 		if imgURL := firstImgSrc(descHTML); imgURL != "" {
 			return imgURL
@@ -52,9 +52,18 @@ func extractFeedMedia(item *gofeed.Item) string {
 				return url
 			}
 		}
-		if contents, ok := ext["content"]; ok && len(contents) > 0 {
-			if url := contents[0].Attrs["url"]; url != "" {
-				return url
+		// Only use media:content if it is explicitly typed as an image;
+		// many feeds include media:content for video/audio which is not a thumbnail.
+		if contents, ok := ext["content"]; ok {
+			for _, c := range contents {
+				medium := c.Attrs["medium"]
+				mimeType := c.Attrs["type"]
+				isImage := medium == "image" || strings.HasPrefix(mimeType, "image/")
+				if isImage {
+					if url := c.Attrs["url"]; url != "" {
+						return url
+					}
+				}
 			}
 		}
 	}
