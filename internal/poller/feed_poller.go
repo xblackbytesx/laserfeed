@@ -71,7 +71,8 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 	if string(f.ImageMode) != "" {
 		imageMode = string(f.ImageMode)
 	}
-	placeholderURL := ""
+	// Per-feed placeholder URL takes priority; fall back to the global setting.
+	placeholderURL := globalSettings.PlaceholderImageURL
 	if f.PlaceholderImageURL != nil {
 		placeholderURL = *f.PlaceholderImageURL
 	}
