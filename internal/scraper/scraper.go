@@ -93,7 +93,9 @@ func (s *Scraper) FetchFeed(ctx context.Context, url, userAgent string) (*gofeed
 // ScrapeContent fetches articleURL and extracts reader-view HTML. Each call has its
 // own 15-second deadline so a slow page cannot stall an entire poll cycle.
 // cookies is an optional raw Cookie header value (e.g. "foo=bar; baz=qux").
-func (s *Scraper) ScrapeContent(ctx context.Context, articleURL, userAgent, selector, selectorType, cookies string) (string, error) {
+// stripSelectors is an optional list of CSS selectors whose matching elements are
+// removed from the extracted content before sanitization.
+func (s *Scraper) ScrapeContent(ctx context.Context, articleURL, userAgent, selector, selectorType, cookies string, stripSelectors []string) (string, error) {
 	sctx, cancel := context.WithTimeout(ctx, perScrapeTimeout)
 	defer cancel()
 
@@ -133,7 +135,26 @@ func (s *Scraper) ScrapeContent(ctx context.Context, articleURL, userAgent, sele
 		return "", err
 	}
 
+	if len(stripSelectors) > 0 {
+		if stripped, err := applyStripSelectors(raw, stripSelectors); err == nil {
+			raw = stripped
+		}
+	}
+
 	return readerPolicy.Sanitize(raw), nil
+}
+
+func applyStripSelectors(htmlFragment string, selectors []string) (string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlFragment))
+	if err != nil {
+		return htmlFragment, err
+	}
+	for _, sel := range selectors {
+		if sel != "" {
+			doc.Find(sel).Remove()
+		}
+	}
+	return doc.Find("body").Html()
 }
 
 func extractCSS(body, selector string) (string, error) {

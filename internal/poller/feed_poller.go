@@ -25,10 +25,11 @@ type Stores struct {
 // scrapeParams holds the resolved scraping configuration for a single feed,
 // merging per-feed overrides on top of global defaults.
 type scrapeParams struct {
-	userAgent    string
-	selector     string
-	selectorType string
-	cookies      string
+	userAgent      string
+	selector       string
+	selectorType   string
+	cookies        string
+	stripSelectors []string
 }
 
 func resolveScrapeParams(f *feed.Feed, globalUA string) scrapeParams {
@@ -44,11 +45,20 @@ func resolveScrapeParams(f *feed.Feed, globalUA string) scrapeParams {
 	if f.ScrapeCookies != nil {
 		ck = *f.ScrapeCookies
 	}
+	var stripSelectors []string
+	if f.ScrapeStripSelectors != nil {
+		for _, line := range strings.Split(*f.ScrapeStripSelectors, "\n") {
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				stripSelectors = append(stripSelectors, trimmed)
+			}
+		}
+	}
 	return scrapeParams{
-		userAgent:    ua,
-		selector:     sel,
-		selectorType: string(f.ScrapeSelectorType),
-		cookies:      ck,
+		userAgent:      ua,
+		selector:       sel,
+		selectorType:   string(f.ScrapeSelectorType),
+		cookies:        ck,
+		stripSelectors: stripSelectors,
 	}
 }
 
@@ -116,7 +126,7 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		var scrapeError string
 
 		if f.ScrapeFullContent && item.Link != "" && !scrapedGUIDs[guid] {
-			scraped, err := sc.ScrapeContent(ctx, item.Link, sp.userAgent, sp.selector, sp.selectorType, sp.cookies)
+			scraped, err := sc.ScrapeContent(ctx, item.Link, sp.userAgent, sp.selector, sp.selectorType, sp.cookies, sp.stripSelectors)
 			switch {
 			case err != nil:
 				slog.Warn("poller: scrape content", "url", item.Link, "err", err)

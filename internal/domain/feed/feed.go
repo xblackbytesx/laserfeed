@@ -31,8 +31,9 @@ type Feed struct {
 	ScrapeFullContent   bool
 	ScrapeSelector      *string
 	ScrapeSelectorType  SelectorType
-	ScrapeMaxAgeDays    int     // 0 = keep forever
-	ScrapeCookies       *string // raw Cookie header value, e.g. "foo=bar; baz=qux"
+	ScrapeMaxAgeDays        int     // 0 = keep forever
+	ScrapeCookies           *string // raw Cookie header value, e.g. "foo=bar; baz=qux"
+	ScrapeStripSelectors    *string // newline-separated CSS selectors to remove from scraped content
 	ImageMode           ImageMode
 	PlaceholderImageURL *string
 	LastPolledAt        *time.Time

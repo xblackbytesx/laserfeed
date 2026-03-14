@@ -53,6 +53,10 @@ templ FeedEdit(csrfToken string, f *feed.Feed, scrapeStats *article.ScrapeStats)
 							<sl-option value="xpath">XPath</sl-option>
 						</sl-select>
 					</div>
+					<sl-textarea name="scrape_strip_selectors" label="Strip selectors" rows="3"
+						value={ derefStr(f.ScrapeStripSelectors) }
+						placeholder="h1&#10;.ad-container&#10;#related-articles"
+						help-text="One CSS selector per line. Matching elements are removed from scraped content before storing."></sl-textarea>
 					<sl-textarea name="scrape_cookies" label="Cookie header" rows="2"
 						value={ derefStr(f.ScrapeCookies) }
 						placeholder="name=value; name2=value2"
