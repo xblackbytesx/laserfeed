@@ -163,6 +163,14 @@ func (h *FeedHandler) Update(c echo.Context) error {
 	} else {
 		f.ScrapeCookies = nil
 	}
+	if raw := strings.TrimSpace(c.FormValue("scrape_strip_selectors")); raw != "" {
+		if len(raw) > 4096 {
+			return echo.NewHTTPError(http.StatusBadRequest, "strip selectors must be 4096 characters or fewer")
+		}
+		f.ScrapeStripSelectors = &raw
+	} else {
+		f.ScrapeStripSelectors = nil
+	}
 	if ph := strings.TrimSpace(c.FormValue("placeholder_image_url")); ph != "" {
 		if err := validateFeedURL(ph); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid placeholder image URL")

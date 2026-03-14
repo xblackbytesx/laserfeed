@@ -120,7 +120,7 @@ func (m *Manager) ReScrapeArticles(feedID string) {
 			default:
 			}
 
-			scraped, err := m.scraper.ScrapeContent(ctx, ref.URL, sp.userAgent, sp.selector, sp.selectorType, sp.cookies)
+			scraped, err := m.scraper.ScrapeContent(ctx, ref.URL, sp.userAgent, sp.selector, sp.selectorType, sp.cookies, sp.stripSelectors)
 			var errMsg string
 			switch {
 			case err != nil:

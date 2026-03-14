@@ -31,8 +31,9 @@ type backupFeed struct {
 	ScrapeSelector      *string      `json:"scrape_selector,omitempty"`
 	ScrapeSelectorType  string       `json:"scrape_selector_type"`
 	ScrapeMaxAgeDays    int          `json:"scrape_max_age_days"`
-	ScrapeCookies       *string      `json:"scrape_cookies,omitempty"`
-	ImageMode           string       `json:"image_mode"`
+	ScrapeCookies           *string      `json:"scrape_cookies,omitempty"`
+	ScrapeStripSelectors    *string      `json:"scrape_strip_selectors,omitempty"`
+	ImageMode               string       `json:"image_mode"`
 	PlaceholderImageURL *string      `json:"placeholder_image_url,omitempty"`
 	FilterRules         []backupRule `json:"filter_rules,omitempty"`
 }
@@ -81,18 +82,19 @@ func (h *SettingsHandler) Export(c echo.Context) error {
 		}
 
 		bf := backupFeed{
-			Name:                f.Name,
-			URL:                 f.URL,
-			Enabled:             f.Enabled,
-			PollIntervalSeconds: f.PollIntervalSeconds,
-			UserAgent:           f.UserAgent,
-			ScrapeFullContent:   f.ScrapeFullContent,
-			ScrapeSelector:      f.ScrapeSelector,
-			ScrapeSelectorType:  string(f.ScrapeSelectorType),
-			ScrapeMaxAgeDays:    f.ScrapeMaxAgeDays,
-			ScrapeCookies:       f.ScrapeCookies,
-			ImageMode:           string(f.ImageMode),
-			PlaceholderImageURL: f.PlaceholderImageURL,
+			Name:                 f.Name,
+			URL:                  f.URL,
+			Enabled:              f.Enabled,
+			PollIntervalSeconds:  f.PollIntervalSeconds,
+			UserAgent:            f.UserAgent,
+			ScrapeFullContent:    f.ScrapeFullContent,
+			ScrapeSelector:       f.ScrapeSelector,
+			ScrapeSelectorType:   string(f.ScrapeSelectorType),
+			ScrapeMaxAgeDays:     f.ScrapeMaxAgeDays,
+			ScrapeCookies:        f.ScrapeCookies,
+			ScrapeStripSelectors: f.ScrapeStripSelectors,
+			ImageMode:            string(f.ImageMode),
+			PlaceholderImageURL:  f.PlaceholderImageURL,
 		}
 		for _, r := range rules {
 			bf.FilterRules = append(bf.FilterRules, backupRule{
@@ -195,6 +197,7 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 			existing.ScrapeSelectorType = feed.SelectorType(bf.ScrapeSelectorType)
 			existing.ScrapeMaxAgeDays = bf.ScrapeMaxAgeDays
 			existing.ScrapeCookies = bf.ScrapeCookies
+			existing.ScrapeStripSelectors = bf.ScrapeStripSelectors
 			existing.ImageMode = feed.ImageMode(bf.ImageMode)
 			existing.PlaceholderImageURL = bf.PlaceholderImageURL
 
@@ -214,18 +217,19 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 			}
 
 			created, err := h.feeds.Create(ctx, &feed.Feed{
-				Name:                bf.Name,
-				URL:                 bf.URL,
-				Enabled:             bf.Enabled,
-				PollIntervalSeconds: bf.PollIntervalSeconds,
-				UserAgent:           bf.UserAgent,
-				ScrapeFullContent:   bf.ScrapeFullContent,
-				ScrapeSelector:      bf.ScrapeSelector,
-				ScrapeSelectorType:  selectorType,
-				ScrapeMaxAgeDays:    bf.ScrapeMaxAgeDays,
-				ScrapeCookies:       bf.ScrapeCookies,
-				ImageMode:           imageMode,
-				PlaceholderImageURL: bf.PlaceholderImageURL,
+				Name:                 bf.Name,
+				URL:                  bf.URL,
+				Enabled:              bf.Enabled,
+				PollIntervalSeconds:  bf.PollIntervalSeconds,
+				UserAgent:            bf.UserAgent,
+				ScrapeFullContent:    bf.ScrapeFullContent,
+				ScrapeSelector:       bf.ScrapeSelector,
+				ScrapeSelectorType:   selectorType,
+				ScrapeMaxAgeDays:     bf.ScrapeMaxAgeDays,
+				ScrapeCookies:        bf.ScrapeCookies,
+				ScrapeStripSelectors: bf.ScrapeStripSelectors,
+				ImageMode:            imageMode,
+				PlaceholderImageURL:  bf.PlaceholderImageURL,
 			})
 			if err != nil {
 				slog.Error("import: create feed", "url", bf.URL, "err", err)
