@@ -21,6 +21,7 @@ templ ChannelEdit(csrfToken string, ch *channel.Channel, channelFeeds []*feed.Fe
 					<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
 					<sl-input name="name" label="Name" value={ ch.Name } required></sl-input>
 					<sl-input name="slug" label="URL slug" value={ ch.Slug } required
+						pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
 						help-text={ "/channels/" + ch.Slug + "/feed.rss" }></sl-input>
 					<sl-textarea name="description" label="Description" value={ ch.Description } rows="3"></sl-textarea>
 					<div class="form-actions" style="margin-top:1rem">

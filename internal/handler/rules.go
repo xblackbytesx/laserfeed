@@ -32,7 +32,7 @@ func (h *RulesHandler) List(c echo.Context) error {
 	rules, err := h.rules.ListByFeedID(ctx, feedID)
 	if err != nil {
 		slog.Error("list filter rules", "feed_id", feedID, "err", err)
-		rules = nil
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load filter rules")
 	}
 
 	return pages.RulesPage(csrfToken(c), f, rules).Render(ctx, c.Response().Writer)
@@ -79,7 +79,7 @@ func (h *RulesHandler) Create(c echo.Context) error {
 	rules, err := h.rules.ListByFeedID(ctx, feedID)
 	if err != nil {
 		slog.Error("list filter rules after create", "feed_id", feedID, "err", err)
-		rules = nil
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load filter rules")
 	}
 	return pages.RulesList(csrfToken(c), feedID, rules).Render(ctx, c.Response().Writer)
 }
@@ -97,7 +97,7 @@ func (h *RulesHandler) Delete(c echo.Context) error {
 	rules, err := h.rules.ListByFeedID(ctx, feedID)
 	if err != nil {
 		slog.Error("list filter rules after delete", "feed_id", feedID, "err", err)
-		rules = nil
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load filter rules")
 	}
 	return pages.RulesList(csrfToken(c), feedID, rules).Render(ctx, c.Response().Writer)
 }

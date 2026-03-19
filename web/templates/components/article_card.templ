@@ -7,7 +7,7 @@ import (
 templ ArticleCard(a *article.Article) {
 	<sl-card class="article-card">
 		if a.ThumbnailURL != "" {
-			<img slot="image" src={ a.ThumbnailURL } alt="" class="article-thumb" loading="lazy"/>
+			<img slot="image" src={ a.ThumbnailURL } alt={ a.Title } class="article-thumb" loading="lazy"/>
 		}
 		<div class="article-content">
 			<a href={ templ.URL(a.URL) } target="_blank" rel="noopener" class="article-title">{ a.Title }</a>

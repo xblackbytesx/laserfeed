@@ -274,5 +274,8 @@ func validateFeedURL(rawURL string) error {
 	if u.Host == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "URL must include a host")
 	}
+	if u.User != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "URL must not contain credentials")
+	}
 	return nil
 }

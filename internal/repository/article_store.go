@@ -205,7 +205,7 @@ func (s *ArticleStore) ListByFeedID(ctx context.Context, feedID string, includeF
 
 func (s *ArticleStore) ListByFeedIDs(ctx context.Context, feedIDs []string, limit, offset int) ([]*article.Article, error) {
 	if len(feedIDs) == 0 {
-		return nil, nil
+		return []*article.Article{}, nil
 	}
 	rows, err := s.db.Query(ctx,
 		`SELECT `+articleCols+` FROM articles
