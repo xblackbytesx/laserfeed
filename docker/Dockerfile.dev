@@ -4,7 +4,7 @@ RUN apk add --no-cache git curl nodejs npm
 
 WORKDIR /app
 
-RUN go install github.com/a-h/templ/cmd/templ@v0.3.857
+RUN go install github.com/a-h/templ/cmd/templ@v0.3.1001
 RUN go install github.com/air-verse/air@v1.61.5
 
 # Install front-end deps and copy assets into the image.
