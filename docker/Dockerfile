@@ -21,7 +21,7 @@ COPY . .
 
 # Generate templ files first — web/templates/pages/*.go must exist before
 # go mod tidy can recognise the package as local (not a missing remote module).
-RUN go install github.com/a-h/templ/cmd/templ@v0.3.857 && \
+RUN go install github.com/a-h/templ/cmd/templ@v0.3.1001 && \
     templ generate
 
 # Tidy ensures go.sum is complete for every package actually imported in source,

@@ -1,15 +1,18 @@
 package scraper
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/antchfx/htmlquery"
+	readability "github.com/go-shiori/go-readability"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/mmcdole/gofeed"
 )
@@ -19,16 +22,6 @@ const maxBodySize = 5 * 1024 * 1024 // 5MB
 // perScrapeTimeout is applied to each individual article fetch independently
 // of any outer poll timeout, so one slow page doesn't starve the rest.
 const perScrapeTimeout = 15 * time.Second
-
-var bestEffortSelectors = []string{
-	"article",
-	"[role=main]",
-	".article-body",
-	".post-content",
-	".entry-content",
-	"main",
-	"body",
-}
 
 // readerPolicy is a bluemonday policy that keeps semantic article content
 // while stripping scripts, ads, nav bars, inline styles, and other noise.
@@ -134,7 +127,7 @@ func (s *Scraper) ScrapeContent(ctx context.Context, articleURL, userAgent, sele
 
 	var raw string
 	if selector == "" {
-		raw, err = bestEffortExtract(string(body))
+		raw, err = readabilityExtract(body, articleURL)
 	} else if selectorType == "xpath" {
 		raw, err = extractXPath(string(body), selector)
 	} else {
@@ -191,19 +184,17 @@ func extractXPath(body, selector string) (string, error) {
 	return htmlquery.OutputHTML(nodes[0], true), nil
 }
 
-func bestEffortExtract(body string) (string, error) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(body))
+// readabilityExtract uses Mozilla's Readability algorithm (via go-readability)
+// to extract the main article content from a full HTML page. The pageURL is
+// used to resolve relative URLs in the extracted content.
+func readabilityExtract(body []byte, pageURL string) (string, error) {
+	u, err := url.Parse(pageURL)
 	if err != nil {
-		return "", fmt.Errorf("parse html: %w", err)
+		return "", fmt.Errorf("parse article URL: %w", err)
 	}
-	for _, sel := range bestEffortSelectors {
-		node := doc.Find(sel).First()
-		if node.Length() > 0 {
-			html, err := node.Html()
-			if err == nil && html != "" {
-				return html, nil
-			}
-		}
+	article, err := readability.FromReader(bytes.NewReader(body), u)
+	if err != nil {
+		return "", fmt.Errorf("readability extract: %w", err)
 	}
-	return "", nil
+	return article.Content, nil
 }
