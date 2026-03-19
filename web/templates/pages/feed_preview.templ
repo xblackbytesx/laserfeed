@@ -96,7 +96,7 @@ templ PreviewArticleRow(a *article.Article, scrapeEnabled bool, showRaw bool) {
 			</div>
 			<div style="display:flex;gap:.5rem;align-items:center;flex-shrink:0">
 				if a.ThumbnailURL != "" {
-					<img src={ a.ThumbnailURL } alt="" style="width:48px;height:48px;object-fit:cover;border-radius:4px"/>
+					<img src={ a.ThumbnailURL } alt={ a.Title } style="width:48px;height:48px;object-fit:cover;border-radius:4px"/>
 				}
 				<sl-relative-time date={ a.PublishedAt.UTC().Format("2006-01-02T15:04:05Z") } class="muted"></sl-relative-time>
 			</div>

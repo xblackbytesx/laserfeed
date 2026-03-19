@@ -161,7 +161,8 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 
 	var doc backupDoc
 	if err := json.Unmarshal(data, &doc); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON: "+err.Error())
+		slog.Warn("import: json unmarshal failed", "err", err)
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON format")
 	}
 	if doc.Version != 1 {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("unsupported backup version %d", doc.Version))
@@ -182,6 +183,10 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 
 	for _, bf := range doc.Feeds {
 		if bf.URL == "" {
+			continue
+		}
+		if err := validateFeedURL(bf.URL); err != nil {
+			slog.Warn("import: skipping feed with invalid URL", "url", bf.URL)
 			continue
 		}
 
@@ -208,11 +213,12 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 			feedID = existing.ID
 		} else {
 			selectorType := feed.SelectorType(bf.ScrapeSelectorType)
-			if selectorType == "" {
+			if selectorType != feed.SelectorTypeCSS && selectorType != feed.SelectorTypeXPath {
 				selectorType = feed.SelectorTypeCSS
 			}
 			imageMode := feed.ImageMode(bf.ImageMode)
-			if imageMode == "" {
+			if imageMode != feed.ImageModeNone && imageMode != feed.ImageModeExtract &&
+				imageMode != feed.ImageModePlaceholder && imageMode != feed.ImageModeRandom {
 				imageMode = feed.ImageModeExtract
 			}
 
@@ -245,10 +251,26 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to replace filter rules")
 		}
 		for _, br := range bf.FilterRules {
+			rt := filterrule.RuleType(br.RuleType)
+			if rt != filterrule.RuleTypeWhitelist && rt != filterrule.RuleTypeBlacklist {
+				slog.Warn("import: skipping rule with invalid type", "feed_url", bf.URL, "type", br.RuleType)
+				continue
+			}
+			mf := filterrule.MatchField(br.MatchField)
+			switch mf {
+			case filterrule.MatchFieldTitle, filterrule.MatchFieldURL,
+				filterrule.MatchFieldContent, filterrule.MatchFieldDescription:
+			default:
+				slog.Warn("import: skipping rule with invalid field", "feed_url", bf.URL, "field", br.MatchField)
+				continue
+			}
+			if br.MatchPattern == "" || len(br.MatchPattern) > 500 {
+				continue
+			}
 			_, err := h.filterRules.Create(ctx, &filterrule.FilterRule{
 				FeedID:       feedID,
-				RuleType:     filterrule.RuleType(br.RuleType),
-				MatchField:   filterrule.MatchField(br.MatchField),
+				RuleType:     rt,
+				MatchField:   mf,
 				MatchPattern: br.MatchPattern,
 			})
 			if err != nil {
@@ -269,7 +291,10 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 	}
 
 	for _, bc := range doc.Channels {
-		if bc.Slug == "" {
+		if bc.Slug == "" || !slugRe.MatchString(bc.Slug) {
+			if bc.Slug != "" {
+				slog.Warn("import: skipping channel with invalid slug", "slug", bc.Slug)
+			}
 			continue
 		}
 

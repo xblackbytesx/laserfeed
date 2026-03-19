@@ -18,19 +18,25 @@ type feedPollState struct {
 }
 
 type Manager struct {
-	mu      sync.Mutex
-	states  map[string]*feedPollState
-	stores  Stores
-	scraper *scraper.Scraper
-	rootCtx context.Context
+	mu         sync.Mutex
+	states     map[string]*feedPollState
+	scraping   map[string]*scrapeState // tracks active ReScrapeArticles goroutines
+	stores     Stores
+	scraper    *scraper.Scraper
+	rootCtx    context.Context
+}
+
+type scrapeState struct {
+	cancel context.CancelFunc
 }
 
 func NewManager(ctx context.Context, stores Stores) *Manager {
 	return &Manager{
-		rootCtx: ctx,
-		states:  make(map[string]*feedPollState),
-		stores:  stores,
-		scraper: scraper.New(),
+		rootCtx:  ctx,
+		states:   make(map[string]*feedPollState),
+		scraping: make(map[string]*scrapeState),
+		stores:   stores,
+		scraper:  scraper.New(),
 	}
 }
 
@@ -68,6 +74,10 @@ func (m *Manager) StopFeed(feedID string) {
 		state.cancel()
 		delete(m.states, feedID)
 	}
+	if ss, ok := m.scraping[feedID]; ok {
+		ss.cancel()
+		delete(m.scraping, feedID)
+	}
 }
 
 func (m *Manager) ForceRefresh(feedID string) {
@@ -83,9 +93,26 @@ func (m *Manager) ForceRefresh(feedID string) {
 }
 
 // ReScrapeArticles re-fetches content for all articles in a feed in the background.
+// If a rescrape is already running for this feed, it is cancelled first.
 func (m *Manager) ReScrapeArticles(feedID string) {
+	m.mu.Lock()
+	if ss, ok := m.scraping[feedID]; ok {
+		ss.cancel() // cancel previous rescrape for this feed
+	}
+	ctx, cancel := context.WithCancel(m.rootCtx)
+	ss := &scrapeState{cancel: cancel}
+	m.scraping[feedID] = ss
+	m.mu.Unlock()
+
 	go func() {
-		ctx := m.rootCtx
+		defer func() {
+			m.mu.Lock()
+			// Only clean up if we're still the active rescrape.
+			if m.scraping[feedID] == ss {
+				delete(m.scraping, feedID)
+			}
+			m.mu.Unlock()
+		}()
 
 		f, err := m.stores.Feeds.GetByID(ctx, feedID)
 		if err != nil {

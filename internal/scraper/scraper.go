@@ -55,8 +55,17 @@ type Scraper struct {
 }
 
 func New() *Scraper {
+	transport := &http.Transport{
+		MaxIdleConns:        50,
+		MaxIdleConnsPerHost: 5,
+		MaxConnsPerHost:     10,
+		IdleConnTimeout:     90 * time.Second,
+	}
 	return &Scraper{
-		client: &http.Client{Timeout: 30 * time.Second},
+		client: &http.Client{
+			Timeout:   30 * time.Second,
+			Transport: transport,
+		},
 	}
 }
 

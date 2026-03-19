@@ -379,12 +379,6 @@ body {
 /* ================================================================
  *  Forms
  * ================================================================ */
-.form-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
 .form-row {
   display: flex;
   gap: 1rem;
@@ -392,8 +386,6 @@ body {
   flex-wrap: wrap;
 }
 .form-row sl-input, .form-row sl-select { flex: 1; min-width: 150px; }
-
-.form-footer { margin-top: 1.5rem; }
 
 sl-card::part(body) { padding: 1rem; }
 

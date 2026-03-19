@@ -19,7 +19,8 @@ templ ChannelList(csrfToken string, channels []*channel.Channel) {
 				<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
 				<sl-input name="name" label="Name" required placeholder="Tech News" id="channel-name-input"></sl-input>
 				<sl-input name="slug" label="URL slug" required placeholder="tech-news" id="channel-slug-input"
-					help-text="Used in the RSS URL: /channels/tech-news/feed.rss"></sl-input>
+					pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+					help-text="Lowercase letters, numbers, and hyphens. Used in the RSS URL: /channels/tech-news/feed.rss"></sl-input>
 				<sl-textarea name="description" label="Description" placeholder="Optional description" rows="2"></sl-textarea>
 				<div class="dialog-footer">
 					<sl-button onclick="document.getElementById('add-channel-dialog').hide()" variant="neutral">Cancel</sl-button>
