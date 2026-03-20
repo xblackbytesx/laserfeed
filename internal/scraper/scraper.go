@@ -94,10 +94,12 @@ func (s *Scraper) FetchFeed(ctx context.Context, url, userAgent string) (*gofeed
 
 // ScrapeContent fetches articleURL and extracts reader-view HTML. Each call has its
 // own 15-second deadline so a slow page cannot stall an entire poll cycle.
-// cookies is an optional raw Cookie header value (e.g. "foo=bar; baz=qux").
-// stripSelectors is an optional list of CSS selectors whose matching elements are
-// removed from the extracted content before sanitization.
-func (s *Scraper) ScrapeContent(ctx context.Context, articleURL, userAgent, selector, selectorType, cookies string, stripSelectors []string) (string, error) {
+//
+// The method parameter controls the extraction pipeline:
+//
+//	"readability" — strip selectors on raw page (classes intact) → readability → unwrap → sanitize
+//	"selector"    — extract via CSS/XPath content selector → strip selectors on fragment → sanitize
+func (s *Scraper) ScrapeContent(ctx context.Context, articleURL, userAgent, method, selector, selectorType, cookies string, stripSelectors, pageStripSelectors []string) (string, error) {
 	sctx, cancel := context.WithTimeout(ctx, perScrapeTimeout)
 	defer cancel()
 
@@ -126,24 +128,60 @@ func (s *Scraper) ScrapeContent(ctx context.Context, articleURL, userAgent, sele
 	}
 
 	var raw string
-	if selector == "" {
-		raw, err = readabilityExtract(body, articleURL)
-	} else if selectorType == "xpath" {
-		raw, err = extractXPath(string(body), selector)
+	if method == "selector" {
+		// Selector mode: extract content fragment, then apply both strip lists on the fragment.
+		if selectorType == "xpath" {
+			raw, err = extractXPath(string(body), selector)
+		} else {
+			raw, err = extractCSS(string(body), selector)
+		}
+		if err != nil {
+			return "", err
+		}
+		combined := append(pageStripSelectors, stripSelectors...)
+		if len(combined) > 0 {
+			if stripped, err := applyStripSelectors(raw, combined); err == nil {
+				raw = stripped
+			}
+		}
 	} else {
-		raw, err = extractCSS(string(body), selector)
-	}
-	if err != nil {
-		return "", err
-	}
-
-	if len(stripSelectors) > 0 {
-		if stripped, err := applyStripSelectors(raw, stripSelectors); err == nil {
-			raw = stripped
+		// Readability mode: two-pass strip on the raw page (classes still intact),
+		// then run readability on the cleaned page.
+		// Pass 1: page strip selectors run unscoped against the full page.
+		// Pass 2: content strip selectors run scoped by the content selector.
+		page := string(body)
+		if len(pageStripSelectors) > 0 {
+			if stripped, err := applyStripSelectors(page, pageStripSelectors); err == nil {
+				page = stripped
+			}
+		}
+		if len(stripSelectors) > 0 {
+			scoped := scopeStripSelectors(stripSelectors, selector)
+			if stripped, err := applyStripSelectors(page, scoped); err == nil {
+				page = stripped
+			}
+		}
+		raw, err = readabilityExtract([]byte(page), articleURL)
+		if err != nil {
+			return "", err
 		}
 	}
 
 	return readerPolicy.Sanitize(raw), nil
+}
+
+// scopeStripSelectors prepends a scope selector to each strip selector so that
+// e.g. scope "article.post-body" + strip ".ad-container" becomes
+// "article.post-body .ad-container". If scope is empty, selectors are returned as-is.
+func scopeStripSelectors(selectors []string, scope string) []string {
+	if scope == "" {
+		return selectors
+	}
+	scoped := make([]string, len(selectors))
+	for i, sel := range selectors {
+		scoped[i] = scope + " " + sel
+	}
+	return scoped
 }
 
 func applyStripSelectors(htmlFragment string, selectors []string) (string, error) {
@@ -196,5 +234,31 @@ func readabilityExtract(body []byte, pageURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("readability extract: %w", err)
 	}
-	return article.Content, nil
+	return unwrapReadability(article.Content), nil
+}
+
+// unwrapReadability removes the outer <div id="readability-page-1"> wrapper
+// that go-readability adds and strips id/class attributes from remaining divs.
+// These are site-specific identifiers (e.g. "main-content") that serve no
+// purpose in feed output and can trigger width-constraining CSS in RSS readers.
+func unwrapReadability(html string) string {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		return html
+	}
+	// Unwrap the readability wrapper: replace it with its children.
+	doc.Find("div#readability-page-1").Each(func(_ int, s *goquery.Selection) {
+		s.ReplaceWithSelection(s.Children())
+	})
+	// Strip id and class attributes from divs — they are site-specific
+	// layout identifiers that have no meaning inside a feed entry.
+	doc.Find("div").Each(func(_ int, s *goquery.Selection) {
+		s.RemoveAttr("id")
+		s.RemoveAttr("class")
+	})
+	result, err := doc.Find("body").Html()
+	if err != nil {
+		return html
+	}
+	return result
 }

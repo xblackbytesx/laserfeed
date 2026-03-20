@@ -14,6 +14,13 @@ const (
 	ImageModeRandom      ImageMode = "random"
 )
 
+type ScrapeMethod string
+
+const (
+	ScrapeMethodReadability ScrapeMethod = "readability"
+	ScrapeMethodSelector    ScrapeMethod = "selector"
+)
+
 type SelectorType string
 
 const (
@@ -29,11 +36,13 @@ type Feed struct {
 	PollIntervalSeconds int
 	UserAgent           *string
 	ScrapeFullContent   bool
+	ScrapeMethod        ScrapeMethod
 	ScrapeSelector      *string
 	ScrapeSelectorType  SelectorType
 	ScrapeMaxAgeDays        int     // 0 = keep forever
 	ScrapeCookies           *string // raw Cookie header value, e.g. "foo=bar; baz=qux"
 	ScrapeStripSelectors    *string // newline-separated CSS selectors to remove from scraped content
+	ScrapePageStripSelectors *string // newline-separated CSS selectors to remove from the full page before extraction
 	ImageMode           ImageMode
 	PlaceholderImageURL *string
 	LastPolledAt        *time.Time

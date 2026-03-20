@@ -25,11 +25,13 @@ type Stores struct {
 // scrapeParams holds the resolved scraping configuration for a single feed,
 // merging per-feed overrides on top of global defaults.
 type scrapeParams struct {
-	userAgent      string
-	selector       string
-	selectorType   string
-	cookies        string
-	stripSelectors []string
+	userAgent          string
+	method             string
+	selector           string
+	selectorType       string
+	cookies            string
+	stripSelectors     []string
+	pageStripSelectors []string
 }
 
 func resolveScrapeParams(f *feed.Feed, globalUA string) scrapeParams {
@@ -53,12 +55,22 @@ func resolveScrapeParams(f *feed.Feed, globalUA string) scrapeParams {
 			}
 		}
 	}
+	var pageStripSelectors []string
+	if f.ScrapePageStripSelectors != nil {
+		for _, line := range strings.Split(*f.ScrapePageStripSelectors, "\n") {
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				pageStripSelectors = append(pageStripSelectors, trimmed)
+			}
+		}
+	}
 	return scrapeParams{
-		userAgent:      ua,
-		selector:       sel,
-		selectorType:   string(f.ScrapeSelectorType),
-		cookies:        ck,
-		stripSelectors: stripSelectors,
+		userAgent:          ua,
+		method:             string(f.ScrapeMethod),
+		selector:           sel,
+		selectorType:       string(f.ScrapeSelectorType),
+		cookies:            ck,
+		stripSelectors:     stripSelectors,
+		pageStripSelectors: pageStripSelectors,
 	}
 }
 
@@ -126,7 +138,7 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		var scrapeError string
 
 		if f.ScrapeFullContent && item.Link != "" && !scrapedGUIDs[guid] {
-			scraped, err := sc.ScrapeContent(ctx, item.Link, sp.userAgent, sp.selector, sp.selectorType, sp.cookies, sp.stripSelectors)
+			scraped, err := sc.ScrapeContent(ctx, item.Link, sp.userAgent, sp.method, sp.selector, sp.selectorType, sp.cookies, sp.stripSelectors, sp.pageStripSelectors)
 			switch {
 			case err != nil:
 				slog.Warn("poller: scrape content", "url", item.Link, "err", err)
@@ -134,10 +146,10 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 				scrapeError = err.Error()
 				content = scraper.SanitizeHTML(item.Content)
 			case strings.TrimSpace(scraped) == "":
-				if sp.selector != "" {
+				if sp.method == "selector" {
 					scrapeError = fmt.Sprintf("selector %q matched no content", sp.selector)
 				} else {
-					scrapeError = "no content could be extracted from the page"
+					scrapeError = "readability could not extract content from the page"
 				}
 				slog.Warn("poller: scrape empty", "url", item.Link, "reason", scrapeError)
 				scrapeStatus = article.ScrapeStatusFailed
