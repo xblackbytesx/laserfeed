@@ -32,10 +32,10 @@ templ Base(title string, csrfToken string) {
 
 templ Sidebar() {
 	<nav class="app-sidebar">
-		<div class="sidebar-logo">
+		<a href="/" class="sidebar-logo">
 			<span class="logo-icon">⚡</span>
 			<span class="logo-text">LaserFeed</span>
-		</div>
+		</a>
 		<ul class="sidebar-nav">
 			<li><a href="/" class="nav-item"><sl-icon name="house"></sl-icon> Dashboard</a></li>
 			<li><a href="/feeds" class="nav-item"><sl-icon name="rss"></sl-icon> Feed Pool</a></li>
