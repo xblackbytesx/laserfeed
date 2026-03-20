@@ -66,6 +66,7 @@ func (h *FeedHandler) Create(c echo.Context) error {
 		URL:                 feedURL,
 		Enabled:             true,
 		PollIntervalSeconds: pollInterval,
+		ScrapeMethod:        feed.ScrapeMethodReadability,
 		ScrapeSelectorType:  feed.SelectorTypeCSS,
 		ImageMode:           imageMode,
 	}
@@ -137,7 +138,16 @@ func (h *FeedHandler) Update(c echo.Context) error {
 	f.ScrapeFullContent = c.FormValue("scrape_full_content") == "true"
 	f.ScrapeMaxAgeDays = scrapeMaxAge
 	f.ImageMode = feed.ImageMode(c.FormValue("image_mode"))
-	f.ScrapeSelectorType = feed.SelectorType(c.FormValue("scrape_selector_type"))
+	scrapeMethod := feed.ScrapeMethod(c.FormValue("scrape_method"))
+	if scrapeMethod != feed.ScrapeMethodReadability && scrapeMethod != feed.ScrapeMethodSelector {
+		scrapeMethod = feed.ScrapeMethodReadability
+	}
+	f.ScrapeMethod = scrapeMethod
+	selectorType := feed.SelectorType(c.FormValue("scrape_selector_type"))
+	if selectorType != feed.SelectorTypeCSS && selectorType != feed.SelectorTypeXPath {
+		selectorType = feed.SelectorTypeCSS
+	}
+	f.ScrapeSelectorType = selectorType
 
 	if ua := strings.TrimSpace(c.FormValue("user_agent")); ua != "" {
 		if len(ua) > 500 {
@@ -165,11 +175,19 @@ func (h *FeedHandler) Update(c echo.Context) error {
 	}
 	if raw := strings.TrimSpace(c.FormValue("scrape_strip_selectors")); raw != "" {
 		if len(raw) > 4096 {
-			return echo.NewHTTPError(http.StatusBadRequest, "strip selectors must be 4096 characters or fewer")
+			return echo.NewHTTPError(http.StatusBadRequest, "content strip selectors must be 4096 characters or fewer")
 		}
 		f.ScrapeStripSelectors = &raw
 	} else {
 		f.ScrapeStripSelectors = nil
+	}
+	if raw := strings.TrimSpace(c.FormValue("scrape_page_strip_selectors")); raw != "" {
+		if len(raw) > 4096 {
+			return echo.NewHTTPError(http.StatusBadRequest, "page strip selectors must be 4096 characters or fewer")
+		}
+		f.ScrapePageStripSelectors = &raw
+	} else {
+		f.ScrapePageStripSelectors = nil
 	}
 	if ph := strings.TrimSpace(c.FormValue("placeholder_image_url")); ph != "" {
 		if err := validateFeedURL(ph); err != nil {

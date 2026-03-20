@@ -18,19 +18,19 @@ func NewFeedStore(db *pgxpool.Pool) *FeedStore {
 }
 
 const feedCols = `id, name, url, enabled, poll_interval_seconds, user_agent,
-	scrape_full_content, scrape_selector, scrape_selector_type, scrape_max_age_days, scrape_cookies,
-	scrape_strip_selectors,
+	scrape_full_content, scrape_method, scrape_selector, scrape_selector_type, scrape_max_age_days, scrape_cookies,
+	scrape_strip_selectors, scrape_page_strip_selectors,
 	image_mode, placeholder_image_url, last_polled_at, last_error, created_at, updated_at`
 
 func scanFeed(row interface{ Scan(...any) error }) (*feed.Feed, error) {
 	f := &feed.Feed{}
-	var scrapeSelector, userAgent, placeholderImageURL, lastError, scrapeCookies, scrapeStripSelectors *string
+	var scrapeSelector, userAgent, placeholderImageURL, lastError, scrapeCookies, scrapeStripSelectors, scrapePageStripSelectors *string
 	var lastPolledAt *time.Time
-	var imageModeStr, selectorTypeStr string
+	var imageModeStr, scrapeMethodStr, selectorTypeStr string
 	err := row.Scan(
 		&f.ID, &f.Name, &f.URL, &f.Enabled, &f.PollIntervalSeconds, &userAgent,
-		&f.ScrapeFullContent, &scrapeSelector, &selectorTypeStr, &f.ScrapeMaxAgeDays, &scrapeCookies,
-		&scrapeStripSelectors,
+		&f.ScrapeFullContent, &scrapeMethodStr, &scrapeSelector, &selectorTypeStr, &f.ScrapeMaxAgeDays, &scrapeCookies,
+		&scrapeStripSelectors, &scrapePageStripSelectors,
 		&imageModeStr, &placeholderImageURL, &lastPolledAt, &lastError,
 		&f.CreatedAt, &f.UpdatedAt,
 	)
@@ -38,10 +38,12 @@ func scanFeed(row interface{ Scan(...any) error }) (*feed.Feed, error) {
 		return nil, err
 	}
 	f.UserAgent = userAgent
+	f.ScrapeMethod = feed.ScrapeMethod(scrapeMethodStr)
 	f.ScrapeSelector = scrapeSelector
 	f.ScrapeSelectorType = feed.SelectorType(selectorTypeStr)
 	f.ScrapeCookies = scrapeCookies
 	f.ScrapeStripSelectors = scrapeStripSelectors
+	f.ScrapePageStripSelectors = scrapePageStripSelectors
 	f.ImageMode = feed.ImageMode(imageModeStr)
 	f.PlaceholderImageURL = placeholderImageURL
 	f.LastPolledAt = lastPolledAt
@@ -52,14 +54,14 @@ func scanFeed(row interface{ Scan(...any) error }) (*feed.Feed, error) {
 func (s *FeedStore) Create(ctx context.Context, f *feed.Feed) (*feed.Feed, error) {
 	row := s.db.QueryRow(ctx,
 		`INSERT INTO feeds (name, url, enabled, poll_interval_seconds, user_agent,
-			scrape_full_content, scrape_selector, scrape_selector_type, scrape_max_age_days, scrape_cookies,
-			scrape_strip_selectors,
+			scrape_full_content, scrape_method, scrape_selector, scrape_selector_type, scrape_max_age_days, scrape_cookies,
+			scrape_strip_selectors, scrape_page_strip_selectors,
 			image_mode, placeholder_image_url)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
 		RETURNING `+feedCols,
 		f.Name, f.URL, f.Enabled, f.PollIntervalSeconds, f.UserAgent,
-		f.ScrapeFullContent, f.ScrapeSelector, string(f.ScrapeSelectorType), f.ScrapeMaxAgeDays, f.ScrapeCookies,
-		f.ScrapeStripSelectors,
+		f.ScrapeFullContent, string(f.ScrapeMethod), f.ScrapeSelector, string(f.ScrapeSelectorType), f.ScrapeMaxAgeDays, f.ScrapeCookies,
+		f.ScrapeStripSelectors, f.ScrapePageStripSelectors,
 		string(f.ImageMode), f.PlaceholderImageURL,
 	)
 	created, err := scanFeed(row)
@@ -115,16 +117,16 @@ func (s *FeedStore) ListEnabled(ctx context.Context) ([]*feed.Feed, error) {
 func (s *FeedStore) Update(ctx context.Context, f *feed.Feed) (*feed.Feed, error) {
 	row := s.db.QueryRow(ctx,
 		`UPDATE feeds SET name=$1, url=$2, enabled=$3, poll_interval_seconds=$4,
-			user_agent=$5, scrape_full_content=$6, scrape_selector=$7,
-			scrape_selector_type=$8, scrape_max_age_days=$9, scrape_cookies=$10,
-			scrape_strip_selectors=$11,
-			image_mode=$12, placeholder_image_url=$13,
+			user_agent=$5, scrape_full_content=$6, scrape_method=$7, scrape_selector=$8,
+			scrape_selector_type=$9, scrape_max_age_days=$10, scrape_cookies=$11,
+			scrape_strip_selectors=$12, scrape_page_strip_selectors=$13,
+			image_mode=$14, placeholder_image_url=$15,
 			updated_at=NOW()
-		WHERE id=$14
+		WHERE id=$16
 		RETURNING `+feedCols,
 		f.Name, f.URL, f.Enabled, f.PollIntervalSeconds, f.UserAgent,
-		f.ScrapeFullContent, f.ScrapeSelector, string(f.ScrapeSelectorType), f.ScrapeMaxAgeDays, f.ScrapeCookies,
-		f.ScrapeStripSelectors,
+		f.ScrapeFullContent, string(f.ScrapeMethod), f.ScrapeSelector, string(f.ScrapeSelectorType), f.ScrapeMaxAgeDays, f.ScrapeCookies,
+		f.ScrapeStripSelectors, f.ScrapePageStripSelectors,
 		string(f.ImageMode), f.PlaceholderImageURL, f.ID,
 	)
 	updated, err := scanFeed(row)

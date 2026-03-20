@@ -44,24 +44,41 @@ templ FeedEdit(csrfToken string, f *feed.Feed, scrapeStats *article.ScrapeStats)
 							Scrape full article content
 						</sl-switch>
 					</div>
-					<div class="form-grid-2">
-						<sl-input name="scrape_selector" label="Content selector"
+					<sl-select name="scrape_method" label="Extraction method" value={ string(f.ScrapeMethod) }
+						help-text="Readability automatically extracts the main article content. Selector lets you target a specific element with CSS or XPath.">
+						<sl-option value="readability">Readability (automatic)</sl-option>
+						<sl-option value="selector">CSS / XPath selector</sl-option>
+					</sl-select>
+					if f.ScrapeMethod == "selector" {
+						<div class="form-grid-2">
+							<sl-input name="scrape_selector" label="Content selector"
+								value={ derefStr(f.ScrapeSelector) }
+								placeholder="article.post-body"
+								help-text="Element to extract article content from."></sl-input>
+							<sl-select name="scrape_selector_type" label="Selector type" value={ string(f.ScrapeSelectorType) }>
+								<sl-option value="css">CSS</sl-option>
+								<sl-option value="xpath">XPath</sl-option>
+							</sl-select>
+						</div>
+					} else {
+						<sl-input name="scrape_selector" label="Strip selector scope"
 							value={ derefStr(f.ScrapeSelector) }
-							placeholder="article.post-body  (leave blank for best-effort)"></sl-input>
-						<sl-select name="scrape_selector_type" label="Selector type" value={ string(f.ScrapeSelectorType) }>
-							<sl-option value="css">CSS</sl-option>
-							<sl-option value="xpath">XPath</sl-option>
-						</sl-select>
-					</div>
-					<sl-textarea name="scrape_strip_selectors" label="Strip selectors" rows="3"
+							placeholder="article.post-body"
+							help-text="Limits content strip selectors to within this element. Leave blank to match the full page."></sl-input>
+					}
+					<sl-textarea name="scrape_page_strip_selectors" label="Page strip selectors" rows="3"
+						value={ derefStr(f.ScrapePageStripSelectors) }
+						placeholder=".ad-container&#10;#cookie-banner&#10;nav.sidebar"
+						help-text={ pageStripSelectorsHelp(f.ScrapeMethod) }></sl-textarea>
+					<sl-textarea name="scrape_strip_selectors" label="Content strip selectors" rows="3"
 						value={ derefStr(f.ScrapeStripSelectors) }
-						placeholder="h1&#10;.ad-container&#10;#related-articles"
-						help-text="One CSS selector per line. Matching elements are removed from scraped content before storing."></sl-textarea>
+						placeholder="h1&#10;ul:first-of-type&#10;.sharing-buttons"
+						help-text={ contentStripSelectorsHelp(f.ScrapeMethod) }></sl-textarea>
 					<sl-textarea name="scrape_cookies" label="Cookie header" rows="2"
 						value={ derefStr(f.ScrapeCookies) }
 						placeholder="name=value; name2=value2"
 						help-text="Sent with every scrape request. Copy from browser DevTools → Network tab → select any request to the site → Request Headers → Cookie."></sl-textarea>
-				<sl-input name="scrape_max_age_days" label="Keep scraped content for (days)"
+					<sl-input name="scrape_max_age_days" label="Keep scraped content for (days)"
 						type="number" min="0" value={ strconv.Itoa(f.ScrapeMaxAgeDays) }
 						help-text="0 = keep forever. Older scraped content is cleared on each poll cycle."></sl-input>
 				</fieldset>
@@ -146,4 +163,18 @@ func derefStr(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func pageStripSelectorsHelp(method feed.ScrapeMethod) string {
+	if method == feed.ScrapeMethodSelector {
+		return "One CSS selector per line. Matching elements are removed from the extracted content fragment."
+	}
+	return "One CSS selector per line. Matching elements are removed from the full page before Readability runs. Use for site-wide junk like ads, navs, and cookie banners."
+}
+
+func contentStripSelectorsHelp(method feed.ScrapeMethod) string {
+	if method == feed.ScrapeMethodSelector {
+		return "One CSS selector per line. Matching elements are also removed from the extracted content fragment."
+	}
+	return "One CSS selector per line. Scoped by the strip selector scope above — targets elements within the article area before Readability runs."
 }

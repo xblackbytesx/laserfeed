@@ -147,16 +147,16 @@ func (m *Manager) ReScrapeArticles(feedID string) {
 			default:
 			}
 
-			scraped, err := m.scraper.ScrapeContent(ctx, ref.URL, sp.userAgent, sp.selector, sp.selectorType, sp.cookies, sp.stripSelectors)
+			scraped, err := m.scraper.ScrapeContent(ctx, ref.URL, sp.userAgent, sp.method, sp.selector, sp.selectorType, sp.cookies, sp.stripSelectors, sp.pageStripSelectors)
 			var errMsg string
 			switch {
 			case err != nil:
 				errMsg = err.Error()
 			case strings.TrimSpace(scraped) == "":
-				if sp.selector != "" {
+				if sp.method == "selector" {
 					errMsg = fmt.Sprintf("selector %q matched no content", sp.selector)
 				} else {
-					errMsg = "no content could be extracted from the page"
+					errMsg = "readability could not extract content from the page"
 				}
 			}
 			if errMsg != "" {
