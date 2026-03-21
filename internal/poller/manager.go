@@ -168,6 +168,13 @@ func (m *Manager) ReScrapeArticles(feedID string) {
 				if updateErr := m.stores.Articles.UpdateScrapeResult(ctx, ref.ID, scraped, ""); updateErr != nil {
 					slog.Error("rescrape: update success status", "id", ref.ID, "err", updateErr)
 				}
+				// Extract thumbnail from freshly scraped content when the article
+				// doesn't already have one (e.g. feed was added before scraping was enabled).
+				if thumb := scraper.ExtractContentImage(scraped); thumb != "" {
+					if updateErr := m.stores.Articles.UpdateThumbnail(ctx, ref.ID, thumb); updateErr != nil {
+						slog.Error("rescrape: update thumbnail", "id", ref.ID, "err", updateErr)
+					}
+				}
 				success++
 			}
 		}
