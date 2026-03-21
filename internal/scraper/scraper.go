@@ -28,7 +28,10 @@ const perScrapeTimeout = 15 * time.Second
 var readerPolicy = func() *bluemonday.Policy {
 	p := bluemonday.UGCPolicy()
 	// Extend UGC policy with structural/semantic elements found in article bodies.
-	p.AllowElements("div", "section", "article", "figure", "figcaption",
+	// Note: article and section are intentionally excluded — they are layout
+	// containers that trigger max-width/padding styles in RSS readers. Bluemonday
+	// strips the tags but preserves their inner content, effectively unwrapping them.
+	p.AllowElements("div", "figure", "figcaption",
 		"time", "abbr", "address", "details", "summary", "mark", "small",
 		"sub", "sup", "caption", "aside")
 	p.AllowAttrs("datetime").OnElements("time")
@@ -237,10 +240,10 @@ func readabilityExtract(body []byte, pageURL string) (string, error) {
 	return unwrapReadability(article.Content), nil
 }
 
-// unwrapReadability removes the outer <div id="readability-page-1"> wrapper
-// that go-readability adds and strips id/class attributes from remaining divs.
-// These are site-specific identifiers (e.g. "main-content") that serve no
-// purpose in feed output and can trigger width-constraining CSS in RSS readers.
+// unwrapReadability cleans up go-readability output for feed embedding:
+//   - removes the outer <div id="readability-page-1"> wrapper
+//   - strips id/class attributes from divs (site-specific layout identifiers)
+//   - removes empty divs (whitespace-only structural noise from sites like AndroidPolice)
 func unwrapReadability(html string) string {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
@@ -256,6 +259,21 @@ func unwrapReadability(html string) string {
 		s.RemoveAttr("id")
 		s.RemoveAttr("class")
 	})
+	// Remove empty divs (contain only whitespace). Walk bottom-up so nested
+	// empty divs collapse correctly — a parent becomes empty once its empty
+	// children are removed.
+	for {
+		removed := false
+		doc.Find("div").Each(func(_ int, s *goquery.Selection) {
+			if strings.TrimSpace(s.Text()) == "" && s.Find("img, video, audio, iframe, svg").Length() == 0 {
+				s.Remove()
+				removed = true
+			}
+		})
+		if !removed {
+			break
+		}
+	}
 	result, err := doc.Find("body").Html()
 	if err != nil {
 		return html
