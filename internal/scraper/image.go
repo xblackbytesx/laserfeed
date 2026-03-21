@@ -3,6 +3,7 @@ package scraper
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -32,13 +33,19 @@ func ExtractThumbnail(item *gofeed.Item, descHTML, contentHTML, imageMode, place
 	case "random":
 		return fmt.Sprintf("https://api.dicebear.com/9.x/identicon/svg?seed=%s", url.QueryEscape(guid))
 	case "extract":
-		if imgURL := firstImgSrc(descHTML); imgURL != "" {
+		if imgURL := bestImgSrc(descHTML); imgURL != "" {
 			return imgURL
 		}
-		return firstImgSrc(contentHTML)
+		return bestImgSrc(contentHTML)
 	default:
 		return ""
 	}
+}
+
+// ExtractContentImage returns the best image URL from scraped HTML content.
+// Used by the re-scrape path where no gofeed.Item is available.
+func ExtractContentImage(contentHTML string) string {
+	return bestImgSrc(contentHTML)
 }
 
 func extractFeedMedia(item *gofeed.Item) string {
@@ -77,7 +84,15 @@ func extractFeedMedia(item *gofeed.Item) string {
 	return ""
 }
 
-func firstImgSrc(html string) string {
+// minThumbnailDim is the minimum width or height (in pixels) for an image to be
+// considered a content image rather than a logo, icon, or tracking pixel.
+const minThumbnailDim = 100
+
+// bestImgSrc picks the best thumbnail image from HTML content. It prefers the
+// image with the largest area (width * height from attributes), falling back to
+// the first image if none have dimensions. Images with width or height below
+// minThumbnailDim are skipped to avoid logos, avatars, and tracking pixels.
+func bestImgSrc(html string) string {
 	if html == "" {
 		return ""
 	}
@@ -85,13 +100,51 @@ func firstImgSrc(html string) string {
 	if err != nil {
 		return ""
 	}
-	src := ""
-	doc.Find("img").EachWithBreak(func(_ int, s *goquery.Selection) bool {
-		if v, exists := s.Attr("src"); exists && v != "" {
-			src = v
-			return false
+
+	var bestURL string
+	var bestArea int
+	var firstURL string
+
+	doc.Find("img").Each(func(_ int, s *goquery.Selection) {
+		src, exists := s.Attr("src")
+		if !exists || src == "" {
+			return
 		}
-		return true
+
+		w := attrInt(s, "width")
+		h := attrInt(s, "height")
+
+		// Skip small images (logos, avatars, tracking pixels).
+		if (w > 0 && w < minThumbnailDim) || (h > 0 && h < minThumbnailDim) {
+			return
+		}
+
+		// Track first valid image as fallback when no dimensions are available.
+		if firstURL == "" {
+			firstURL = src
+		}
+
+		area := w * h
+		if area > bestArea {
+			bestArea = area
+			bestURL = src
+		}
 	})
-	return src
+
+	if bestURL != "" {
+		return bestURL
+	}
+	return firstURL
+}
+
+func attrInt(s *goquery.Selection, name string) int {
+	v, exists := s.Attr(name)
+	if !exists {
+		return 0
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }

@@ -51,6 +51,7 @@ type Repository interface {
 	DeleteOldest(ctx context.Context, feedID string, keepCount int) error
 
 	UpdateScrapeResult(ctx context.Context, id, content, errMsg string) error
+	UpdateThumbnail(ctx context.Context, id, thumbnailURL string) error
 	GetScrapeStats(ctx context.Context, feedID string) (*ScrapeStats, error)
 	GetScrapedGUIDs(ctx context.Context, feedID string) (map[string]bool, error)
 	ListForReScrape(ctx context.Context, feedID string) ([]*ArticleRef, error)

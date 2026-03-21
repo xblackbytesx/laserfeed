@@ -48,7 +48,8 @@ func (s *ArticleStore) Upsert(ctx context.Context, a *article.Article) error {
 		ON CONFLICT (feed_id, guid) DO UPDATE SET
 			title=EXCLUDED.title, url=EXCLUDED.url, author=EXCLUDED.author,
 			description=EXCLUDED.description,
-			thumbnail_url=EXCLUDED.thumbnail_url, published_at=EXCLUDED.published_at,
+			thumbnail_url = CASE WHEN EXCLUDED.thumbnail_url != '' THEN EXCLUDED.thumbnail_url ELSE articles.thumbnail_url END,
+			published_at=EXCLUDED.published_at,
 			fetched_at=EXCLUDED.fetched_at, is_filtered_out=EXCLUDED.is_filtered_out,
 			-- Preserve a previously successful scrape: don't overwrite good content
 			-- with a failed re-attempt (e.g. transient network error on next poll).
@@ -99,6 +100,17 @@ func (s *ArticleStore) UpdateScrapeResult(ctx context.Context, id, content, errM
 	)
 	if err != nil {
 		return fmt.Errorf("update scrape result: %w", err)
+	}
+	return nil
+}
+
+func (s *ArticleStore) UpdateThumbnail(ctx context.Context, id, thumbnailURL string) error {
+	_, err := s.db.Exec(ctx,
+		`UPDATE articles SET thumbnail_url=$1 WHERE id=$2 AND (thumbnail_url = '' OR thumbnail_url IS NULL)`,
+		thumbnailURL, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update thumbnail: %w", err)
 	}
 	return nil
 }
