@@ -48,6 +48,10 @@ templ FeedList(csrfToken string, feeds []*feed.Feed) {
 				<div class="empty-state">
 					<sl-icon name="rss" style="font-size:2rem;color:var(--color-muted)"></sl-icon>
 					<p>No feeds yet. Add your first feed source above.</p>
+					<p class="muted small">
+						Already using another feed reader?
+						<a href="/settings#opml">Import your subscriptions via OPML</a>.
+					</p>
 				</div>
 			</sl-card>
 		}
