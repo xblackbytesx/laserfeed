@@ -89,5 +89,44 @@ templ SettingsPage(csrfToken string, s *settings.Settings) {
 				</div>
 			</div>
 		</sl-card>
+
+		<hr style="max-width:640px;margin:1.5rem 0"/>
+
+		<sl-card id="opml" style="max-width:640px">
+			<div style="display:flex;flex-direction:column;gap:1.25rem">
+				<div>
+					<div style="font-weight:600;margin-bottom:.25rem">OPML</div>
+					<p class="muted small">
+						Import subscriptions from another feed reader, or export a standard OPML file for use elsewhere.
+						OPML only carries feed names and URLs — use the full backup above to preserve LaserFeed-specific
+						settings like filter rules and scrape configuration. Channels are mapped to OPML folders.
+					</p>
+				</div>
+
+				<div>
+					<div class="muted small" style="margin-bottom:.5rem;font-weight:500">Export</div>
+					<a href="/settings/export/opml" hx-boost="false">
+						<sl-button variant="neutral" size="small">
+							<sl-icon slot="prefix" name="download"></sl-icon>
+							Download OPML
+						</sl-button>
+					</a>
+				</div>
+
+				<div>
+					<div class="muted small" style="margin-bottom:.5rem;font-weight:500">Import</div>
+					<form method="POST" action="/settings/import/opml" enctype="multipart/form-data"
+						style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap">
+						<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+						<input type="file" name="opml_file" accept=".opml,.xml" required
+							style="flex:1;min-width:200px;color:var(--color-text);font-size:.875rem"/>
+						<sl-button type="submit" variant="neutral" size="small">
+							<sl-icon slot="prefix" name="upload"></sl-icon>
+							Import
+						</sl-button>
+					</form>
+				</div>
+			</div>
+		</sl-card>
 	}
 }

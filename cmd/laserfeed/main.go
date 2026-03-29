@@ -148,6 +148,8 @@ func main() {
 	e.POST("/settings", settingsHandler.Post)
 	e.GET("/settings/export", settingsHandler.Export)
 	e.POST("/settings/import", settingsHandler.Import)
+	e.GET("/settings/export/opml", settingsHandler.ExportOPML)
+	e.POST("/settings/import/opml", settingsHandler.ImportOPML)
 
 	go func() {
 		sig := make(chan os.Signal, 1)

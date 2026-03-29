@@ -16,7 +16,7 @@ LaserFeed is a self-hosted RSS/Atom feed aggregator. Add feed sources to a share
 - **Channels** — named aggregates that combine any subset of feeds into a single Atom feed at `/channels/:slug/feed.rss`
 - **Thumbnails** — automatic extraction from feed media tags; configurable fallback (extract from content, placeholder URL, or per-article identicon)
 - **Content retention** — configurable max age for scraped content; manual purge and re-scrape controls
-- **Import / Export** — round-trip full configuration (feeds, filters, channels) via a documented JSON backup
+- **Import / Export** — round-trip full configuration (feeds, filters, channels) via a documented JSON backup; OPML import/export for migrating to or from other feed readers
 - **Dark theme** — built with Shoelace web components on an OLED-black palette
 
 ---
