@@ -10,6 +10,7 @@ import (
 	"github.com/laserfeed/laserfeed/internal/domain/feed"
 	"github.com/laserfeed/laserfeed/internal/domain/filterrule"
 	"github.com/laserfeed/laserfeed/internal/domain/settings"
+	"github.com/laserfeed/laserfeed/internal/poller"
 	"github.com/laserfeed/laserfeed/web/templates/pages"
 )
 
@@ -18,6 +19,7 @@ type SettingsHandler struct {
 	feeds       feed.Repository
 	filterRules filterrule.Repository
 	channels    channel.Repository
+	poller      *poller.Manager
 }
 
 func NewSettingsHandler(
@@ -25,8 +27,9 @@ func NewSettingsHandler(
 	f feed.Repository,
 	fr filterrule.Repository,
 	ch channel.Repository,
+	pm *poller.Manager,
 ) *SettingsHandler {
-	return &SettingsHandler{settings: s, feeds: f, filterRules: fr, channels: ch}
+	return &SettingsHandler{settings: s, feeds: f, filterRules: fr, channels: ch, poller: pm}
 }
 
 func (h *SettingsHandler) Get(c echo.Context) error {
@@ -56,7 +59,7 @@ func (h *SettingsHandler) Post(c echo.Context) error {
 
 	imageMode := c.FormValue("image_mode")
 	switch imageMode {
-	case "none", "extract", "placeholder", "random":
+	case "none", "placeholder", "random":
 		// valid
 	default:
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid image mode")

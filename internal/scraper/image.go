@@ -15,29 +15,30 @@ import (
 // Priority:
 //  1. Feed-provided media (media:thumbnail, media:content, gofeed Image, image/* enclosure)
 //     — returned unconditionally regardless of imageMode.
-//  2. Fallback strategy from imageMode, used only when the feed provides nothing:
+//  2. First large <img> found in description then content HTML — always attempted,
+//     whether or not full-content scraping is enabled.
+//  3. Final fallback from imageMode, applied only when no image is found above:
 //     "none"        → return ""
 //     "placeholder" → configured placeholder URL
 //     "random"      → DiceBear identicon seeded by article GUID
-//     "extract"     → first <img> found in description then content HTML
 func ExtractThumbnail(item *gofeed.Item, descHTML, contentHTML, imageMode, placeholderURL, guid string) string {
 	if mediaURL := extractFeedMedia(item); mediaURL != "" {
 		return mediaURL
 	}
 
+	if imgURL := bestImgSrc(descHTML); imgURL != "" {
+		return imgURL
+	}
+	if imgURL := bestImgSrc(contentHTML); imgURL != "" {
+		return imgURL
+	}
+
 	switch imageMode {
-	case "none":
-		return ""
 	case "placeholder":
 		return placeholderURL
 	case "random":
 		return fmt.Sprintf("https://api.dicebear.com/9.x/identicon/svg?seed=%s", url.QueryEscape(guid))
-	case "extract":
-		if imgURL := bestImgSrc(descHTML); imgURL != "" {
-			return imgURL
-		}
-		return bestImgSrc(contentHTML)
-	default:
+	default: // "none" or anything unrecognised
 		return ""
 	}
 }

@@ -28,18 +28,20 @@ templ SettingsPage(csrfToken string, s *settings.Settings) {
 				<fieldset class="form-section">
 					<legend>Thumbnails</legend>
 					<p class="muted small" style="margin-bottom:.25rem">
-						Feed-provided images (<code>media:thumbnail</code>, enclosures) are always used first.
-						This setting is the <strong>fallback</strong> applied only when the feed provides nothing.
+						LaserFeed always tries images in this order: (1) feed-provided media
+						(<code>media:thumbnail</code>, enclosures), (2) first large <code>&lt;img&gt;</code>
+						found in the article content. The setting below is the <strong>final fallback</strong>
+						used only when neither source yields an image.
+						The built-in placeholder SVG is available at <code>/static/images/laserfeed-placeholder.svg</code>.
 					</p>
-					<sl-select name="image_mode" label="Default fallback image mode" value={ s.ImageMode }>
-						<sl-option value="extract">Extract first &lt;img&gt; from content</sl-option>
+					<sl-select name="image_mode" label="Default final fallback" value={ s.ImageMode }>
 						<sl-option value="none">None — leave blank</sl-option>
-						<sl-option value="placeholder">Fixed placeholder URL</sl-option>
+						<sl-option value="placeholder">Fixed placeholder image</sl-option>
 						<sl-option value="random">Random identicon (per article)</sl-option>
 					</sl-select>
 					<sl-input name="placeholder_image_url" label="Default placeholder image URL"
 						value={ s.PlaceholderImageURL }
-						placeholder="https://example.com/placeholder.png"></sl-input>
+						placeholder="/static/images/laserfeed-placeholder.svg"></sl-input>
 				</fieldset>
 
 				<div class="form-actions">

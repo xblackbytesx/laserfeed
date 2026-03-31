@@ -9,7 +9,6 @@ type ImageMode string
 
 const (
 	ImageModeNone        ImageMode = "none"
-	ImageModeExtract     ImageMode = "extract"
 	ImageModePlaceholder ImageMode = "placeholder"
 	ImageModeRandom      ImageMode = "random"
 )
