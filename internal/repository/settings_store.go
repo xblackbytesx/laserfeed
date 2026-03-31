@@ -46,11 +46,17 @@ func (s *SettingsStore) Get(ctx context.Context) (*settings.Settings, error) {
 		max = 500
 	}
 
+	builtin := m["builtin_placeholder"]
+	if builtin == "" {
+		builtin = "laserfeed-placeholder.svg"
+	}
+
 	return &settings.Settings{
 		UserAgent:           m["user_agent"],
 		PollIntervalSeconds: poll,
 		ImageMode:           m["image_mode"],
 		PlaceholderImageURL: m["placeholder_image_url"],
+		BuiltinPlaceholder:  builtin,
 		MaxArticlesPerFeed:  max,
 	}, nil
 }

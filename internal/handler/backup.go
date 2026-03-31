@@ -237,7 +237,8 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 			if imageMode == "extract" {
 				imageMode = feed.ImageModeNone
 			}
-			if imageMode != feed.ImageModeNone && imageMode != feed.ImageModePlaceholder && imageMode != feed.ImageModeRandom {
+			if imageMode != feed.ImageModeNone && imageMode != feed.ImageModePlaceholder &&
+				imageMode != feed.ImageModeRandom && imageMode != feed.ImageModeBuiltin {
 				imageMode = feed.ImageModeRandom
 			}
 

@@ -59,7 +59,7 @@ func (h *SettingsHandler) Post(c echo.Context) error {
 
 	imageMode := c.FormValue("image_mode")
 	switch imageMode {
-	case "none", "placeholder", "random":
+	case "none", "placeholder", "random", "builtin":
 		// valid
 	default:
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid image mode")
@@ -77,11 +77,20 @@ func (h *SettingsHandler) Post(c echo.Context) error {
 		}
 	}
 
+	builtin := c.FormValue("builtin_placeholder")
+	switch builtin {
+	case "laserfeed-placeholder.svg", "laserfeed-placeholder-2.svg", "laserfeed-placeholder-3.svg":
+		// valid
+	default:
+		builtin = "laserfeed-placeholder.svg"
+	}
+
 	pairs := map[string]string{
 		"user_agent":            ua,
 		"poll_interval_seconds": strconv.Itoa(pollInterval),
 		"image_mode":            imageMode,
 		"placeholder_image_url": ph,
+		"builtin_placeholder":   builtin,
 		"max_articles_per_feed": strconv.Itoa(maxArticles),
 	}
 	if err := h.settings.SetAll(ctx, pairs); err != nil {

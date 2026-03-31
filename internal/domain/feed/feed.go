@@ -11,6 +11,7 @@ const (
 	ImageModeNone        ImageMode = "none"
 	ImageModePlaceholder ImageMode = "placeholder"
 	ImageModeRandom      ImageMode = "random"
+	ImageModeBuiltin     ImageMode = "builtin"
 )
 
 type ScrapeMethod string

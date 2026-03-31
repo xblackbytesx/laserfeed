@@ -94,8 +94,9 @@ templ FeedEdit(csrfToken string, f *feed.Feed, scrapeStats *article.ScrapeStats)
 								</sl-tooltip>
 							</span>
 							<sl-option value="none">None — leave blank</sl-option>
-							<sl-option value="placeholder">Fixed placeholder image</sl-option>
+							<sl-option value="placeholder">Custom placeholder image</sl-option>
 							<sl-option value="random">Random identicon (per article)</sl-option>
+							<sl-option value="builtin">LaserFeed placeholder</sl-option>
 						</sl-select>
 						<sl-input name="placeholder_image_url" label="Placeholder image URL"
 							value={ derefStr(f.PlaceholderImageURL) }

@@ -98,6 +98,11 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 	if f.PlaceholderImageURL != nil {
 		placeholderURL = *f.PlaceholderImageURL
 	}
+	// Resolve "builtin" mode: treat it as "placeholder" with the chosen built-in SVG path.
+	if imageMode == "builtin" {
+		imageMode = "placeholder"
+		placeholderURL = "/static/images/" + globalSettings.BuiltinPlaceholder
+	}
 
 	parsedFeed, err := sc.FetchFeed(ctx, f.URL, sp.userAgent)
 	now := time.Now()
