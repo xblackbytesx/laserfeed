@@ -65,7 +65,7 @@ func main() {
 	feedHandler := handler.NewFeedHandler(feedStore, articleStore, filterRuleStore, pollerManager)
 	rulesHandler := handler.NewRulesHandler(feedStore, filterRuleStore)
 	channelHandler := handler.NewChannelHandler(channelStore, feedStore)
-	settingsHandler := handler.NewSettingsHandler(settingsStore, feedStore, filterRuleStore, channelStore)
+	settingsHandler := handler.NewSettingsHandler(settingsStore, feedStore, filterRuleStore, channelStore, pollerManager)
 	feedOutHandler := handler.NewFeedOutHandler(channelStore, articleStore, feedStore, cfg.AppBaseURL)
 
 	e := echo.New()
@@ -123,6 +123,7 @@ func main() {
 	e.GET("/feeds/:id/edit", feedHandler.Edit)
 	e.POST("/feeds/:id/update", feedHandler.Update)
 	e.POST("/feeds/:id/delete", feedHandler.Delete)
+	e.POST("/feeds/refresh-all", feedHandler.RefreshAll)
 	e.POST("/feeds/:id/refresh", feedHandler.Refresh)
 	e.GET("/feeds/:id/preview", feedHandler.Preview)
 	e.POST("/feeds/:id/scrape", feedHandler.Scrape)

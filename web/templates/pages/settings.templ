@@ -27,19 +27,62 @@ templ SettingsPage(csrfToken string, s *settings.Settings) {
 
 				<fieldset class="form-section">
 					<legend>Thumbnails</legend>
-					<p class="muted small" style="margin-bottom:.25rem">
-						Feed-provided images (<code>media:thumbnail</code>, enclosures) are always used first.
-						This setting is the <strong>fallback</strong> applied only when the feed provides nothing.
+					<p class="muted small" style="margin-bottom:.5rem">
+						LaserFeed always tries images in this order: (1) feed-provided media
+						(<code>media:thumbnail</code>, enclosures), (2) first large <code>&lt;img&gt;</code>
+						found in the article content. The setting below is the <strong>final fallback</strong>
+						used only when neither source yields an image.
 					</p>
-					<sl-select name="image_mode" label="Default fallback image mode" value={ s.ImageMode }>
-						<sl-option value="extract">Extract first &lt;img&gt; from content</sl-option>
+					<sl-select id="image-mode-select" name="image_mode" label="Default final fallback" value={ s.ImageMode }>
 						<sl-option value="none">None — leave blank</sl-option>
-						<sl-option value="placeholder">Fixed placeholder URL</sl-option>
+						<sl-option value="placeholder">Custom placeholder image</sl-option>
 						<sl-option value="random">Random identicon (per article)</sl-option>
+						<sl-option value="builtin">LaserFeed placeholder</sl-option>
 					</sl-select>
-					<sl-input name="placeholder_image_url" label="Default placeholder image URL"
-						value={ s.PlaceholderImageURL }
-						placeholder="https://example.com/placeholder.png"></sl-input>
+
+					<div id="custom-placeholder-section">
+						<sl-input name="placeholder_image_url" label="Placeholder image URL"
+							value={ s.PlaceholderImageURL }
+							placeholder="https://example.com/placeholder.png"></sl-input>
+					</div>
+
+					<div id="builtin-placeholder-section">
+						<div style="font-size:.875rem;margin-bottom:.5rem">Choose built-in placeholder</div>
+						<div style="display:flex;gap:.75rem;flex-wrap:wrap">
+							<label class="builtin-card">
+								<input type="radio" name="builtin_placeholder" value="laserfeed-placeholder.svg"
+									if s.BuiltinPlaceholder == "laserfeed-placeholder.svg" || s.BuiltinPlaceholder == "" { checked }/>
+								<img src="/static/images/laserfeed-placeholder.svg" alt="Laser" loading="lazy"/>
+								<span>Laser</span>
+							</label>
+							<label class="builtin-card">
+								<input type="radio" name="builtin_placeholder" value="laserfeed-placeholder-2.svg"
+									if s.BuiltinPlaceholder == "laserfeed-placeholder-2.svg" { checked }/>
+								<img src="/static/images/laserfeed-placeholder-2.svg" alt="Signal" loading="lazy"/>
+								<span>Signal</span>
+							</label>
+							<label class="builtin-card">
+								<input type="radio" name="builtin_placeholder" value="laserfeed-placeholder-3.svg"
+									if s.BuiltinPlaceholder == "laserfeed-placeholder-3.svg" { checked }/>
+								<img src="/static/images/laserfeed-placeholder-3.svg" alt="Minimal" loading="lazy"/>
+								<span>Minimal</span>
+							</label>
+						</div>
+					</div>
+
+					<script>
+					(function() {
+						function syncMode(val) {
+							document.getElementById('custom-placeholder-section').style.display =
+								val === 'placeholder' ? '' : 'none';
+							document.getElementById('builtin-placeholder-section').style.display =
+								val === 'builtin' ? '' : 'none';
+						}
+						var sel = document.getElementById('image-mode-select');
+						syncMode(sel.value);
+						sel.addEventListener('sl-change', function() { syncMode(sel.value); });
+					})();
+					</script>
 				</fieldset>
 
 				<div class="form-actions">

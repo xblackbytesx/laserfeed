@@ -57,8 +57,8 @@ func (h *FeedHandler) Create(c echo.Context) error {
 	}
 
 	imageMode := feed.ImageMode(c.FormValue("image_mode"))
-	if imageMode == "" {
-		imageMode = feed.ImageModeExtract
+	if imageMode == "" || imageMode == "extract" {
+		imageMode = feed.ImageModeRandom
 	}
 
 	f := &feed.Feed{
@@ -137,7 +137,11 @@ func (h *FeedHandler) Update(c echo.Context) error {
 	f.PollIntervalSeconds = pollInterval
 	f.ScrapeFullContent = c.FormValue("scrape_full_content") == "true"
 	f.ScrapeMaxAgeDays = scrapeMaxAge
-	f.ImageMode = feed.ImageMode(c.FormValue("image_mode"))
+	editImageMode := feed.ImageMode(c.FormValue("image_mode"))
+	if editImageMode == "extract" {
+		editImageMode = feed.ImageModeNone
+	}
+	f.ImageMode = editImageMode
 	scrapeMethod := feed.ScrapeMethod(c.FormValue("scrape_method"))
 	if scrapeMethod != feed.ScrapeMethodReadability && scrapeMethod != feed.ScrapeMethodSelector {
 		scrapeMethod = feed.ScrapeMethodReadability
@@ -225,6 +229,11 @@ func (h *FeedHandler) Delete(c echo.Context) error {
 
 func (h *FeedHandler) Refresh(c echo.Context) error {
 	h.poller.ForceRefresh(c.Param("id"))
+	return redirect(c, "/feeds")
+}
+
+func (h *FeedHandler) RefreshAll(c echo.Context) error {
+	h.poller.RefreshAll()
 	return redirect(c, "/feeds")
 }
 

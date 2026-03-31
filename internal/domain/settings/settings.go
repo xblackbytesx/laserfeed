@@ -9,6 +9,7 @@ type Settings struct {
 	PollIntervalSeconds int
 	ImageMode           string
 	PlaceholderImageURL string
+	BuiltinPlaceholder  string // filename of selected built-in SVG, e.g. "laserfeed-placeholder.svg"
 	MaxArticlesPerFeed  int
 }
 

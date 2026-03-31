@@ -258,13 +258,15 @@ func (h *SettingsHandler) ImportOPML(c echo.Context) error {
 			ScrapeFullContent:   false,
 			ScrapeMethod:        feed.ScrapeMethodReadability,
 			ScrapeSelectorType:  feed.SelectorTypeCSS,
-			ImageMode:           feed.ImageModeExtract,
+			ImageMode:           feed.ImageModeRandom,
 		})
 		if err != nil {
 			slog.Error("opml import: create feed", "url", pf.url, "err", err)
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to create feed: "+pf.url)
 		}
 		importedFeedID[pf.url] = created.ID
+		h.poller.StartFeed(created)
+		h.poller.ForceRefresh(created.ID)
 	}
 
 	// Group parsed feeds by folder name and create/upsert channels.

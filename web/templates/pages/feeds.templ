@@ -9,10 +9,19 @@ templ FeedList(csrfToken string, feeds []*feed.Feed) {
 	@layouts.Base("Feed Pool", csrfToken) {
 		<div class="page-header">
 			<h1>Feed Pool</h1>
-			<sl-button variant="primary" onclick="document.getElementById('add-feed-dialog').show()">
-				<sl-icon slot="prefix" name="plus-circle"></sl-icon>
-				Add Feed
-			</sl-button>
+			<div style="display:flex;gap:.5rem">
+				<form method="POST" action="/feeds/refresh-all">
+					<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+					<sl-button type="submit" variant="neutral">
+						<sl-icon slot="prefix" name="arrow-clockwise"></sl-icon>
+						Refresh All
+					</sl-button>
+				</form>
+				<sl-button variant="primary" onclick="document.getElementById('add-feed-dialog').show()">
+					<sl-icon slot="prefix" name="plus-circle"></sl-icon>
+					Add Feed
+				</sl-button>
+			</div>
 		</div>
 		<sl-dialog label="Add Feed Source" id="add-feed-dialog">
 			<form method="POST" action="/feeds" class="dialog-form">
@@ -21,17 +30,17 @@ templ FeedList(csrfToken string, feeds []*feed.Feed) {
 				<sl-input name="url" label="Feed URL" required type="url" placeholder="https://hnrss.org/frontpage"></sl-input>
 				<div class="form-row">
 					<sl-input name="poll_interval_seconds" label="Poll interval (s)" type="number" value="3600" style="flex:1"></sl-input>
-					<sl-select name="image_mode" value="extract" style="flex:1">
+					<sl-select name="image_mode" value="random" style="flex:1">
 						<span slot="label">
-							Fallback image mode
-							<sl-tooltip content="LaserFeed always uses the feed&#39;s own media:thumbnail, media:content, or enclosure image when available. The setting below is the fallback strategy applied only when the feed provides no image at all.">
+							Final fallback image
+							<sl-tooltip content="LaserFeed always checks: (1) feed-provided media, (2) first large img in article content. This setting is the last resort when neither yields an image.">
 								<sl-icon name="info-circle" style="font-size:.85em;vertical-align:middle;cursor:default;color:var(--color-muted);margin-left:.3rem"></sl-icon>
 							</sl-tooltip>
 						</span>
-						<sl-option value="extract">Extract first &lt;img&gt; from content</sl-option>
 						<sl-option value="none">None — leave blank</sl-option>
-						<sl-option value="placeholder">Fixed placeholder URL</sl-option>
+						<sl-option value="placeholder">Custom placeholder image</sl-option>
 						<sl-option value="random">Random identicon (per article)</sl-option>
+						<sl-option value="builtin">LaserFeed placeholder</sl-option>
 					</sl-select>
 				</div>
 				<div class="dialog-footer">

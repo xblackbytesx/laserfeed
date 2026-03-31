@@ -216,11 +216,14 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 			existing.ImageMode = feed.ImageMode(bf.ImageMode)
 			existing.PlaceholderImageURL = bf.PlaceholderImageURL
 
-			if _, err := h.feeds.Update(ctx, existing); err != nil {
+			updated, err := h.feeds.Update(ctx, existing)
+			if err != nil {
 				slog.Error("import: update feed", "url", bf.URL, "err", err)
 				return echo.NewHTTPError(http.StatusInternalServerError, "failed to update feed: "+bf.URL)
 			}
 			feedID = existing.ID
+			h.poller.StartFeed(updated)
+			h.poller.ForceRefresh(feedID)
 		} else {
 			scrapeMethod := feed.ScrapeMethod(bf.ScrapeMethod)
 			if scrapeMethod != feed.ScrapeMethodReadability && scrapeMethod != feed.ScrapeMethodSelector {
@@ -231,9 +234,12 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 				selectorType = feed.SelectorTypeCSS
 			}
 			imageMode := feed.ImageMode(bf.ImageMode)
-			if imageMode != feed.ImageModeNone && imageMode != feed.ImageModeExtract &&
-				imageMode != feed.ImageModePlaceholder && imageMode != feed.ImageModeRandom {
-				imageMode = feed.ImageModeExtract
+			if imageMode == "extract" {
+				imageMode = feed.ImageModeNone
+			}
+			if imageMode != feed.ImageModeNone && imageMode != feed.ImageModePlaceholder &&
+				imageMode != feed.ImageModeRandom && imageMode != feed.ImageModeBuiltin {
+				imageMode = feed.ImageModeRandom
 			}
 
 			created, err := h.feeds.Create(ctx, &feed.Feed{
@@ -258,6 +264,8 @@ func (h *SettingsHandler) Import(c echo.Context) error {
 				return echo.NewHTTPError(http.StatusInternalServerError, "failed to create feed: "+bf.URL)
 			}
 			feedID = created.ID
+			h.poller.StartFeed(created)
+			h.poller.ForceRefresh(feedID)
 		}
 
 		importedFeedID[bf.URL] = feedID

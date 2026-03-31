@@ -569,3 +569,45 @@ fieldset.form-section legend {
 .scraped-content-preview a  { color: var(--color-accent); }
 .scraped-content-preview p,
 .scraped-content-preview li { margin-bottom: .5rem; }
+
+/* Built-in placeholder image picker cards */
+.builtin-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .35rem;
+  cursor: pointer;
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  width: 260px;
+  transition: border-color .15s, box-shadow .15s;
+  background: var(--color-surface);
+}
+.builtin-card input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.builtin-card img {
+  width: 100%;
+  height: 146px;
+  object-fit: cover;
+  display: block;
+}
+.builtin-card span {
+  font-size: .8rem;
+  color: var(--color-muted);
+  padding: .3rem 0 .4rem;
+}
+.builtin-card:has(input:checked) {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+.builtin-card:has(input:checked) span {
+  color: var(--color-accent);
+}
+.builtin-card:hover {
+  border-color: var(--sl-color-neutral-400);
+}

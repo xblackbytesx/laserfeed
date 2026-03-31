@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <defs>
+    <radialGradient id="bg3" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#1c1c1c"/>
+      <stop offset="100%" stop-color="#111111"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="640" height="360" fill="url(#bg3)"/>
+
+  <!-- Subtle dot grid -->
+  <g fill="#333333" opacity="0.5">
+    <circle cx="40"  cy="40"  r="1.2"/><circle cx="80"  cy="40"  r="1.2"/><circle cx="120" cy="40"  r="1.2"/>
+    <circle cx="160" cy="40"  r="1.2"/><circle cx="200" cy="40"  r="1.2"/><circle cx="240" cy="40"  r="1.2"/>
+    <circle cx="280" cy="40"  r="1.2"/><circle cx="320" cy="40"  r="1.2"/><circle cx="360" cy="40"  r="1.2"/>
+    <circle cx="400" cy="40"  r="1.2"/><circle cx="440" cy="40"  r="1.2"/><circle cx="480" cy="40"  r="1.2"/>
+    <circle cx="520" cy="40"  r="1.2"/><circle cx="560" cy="40"  r="1.2"/><circle cx="600" cy="40"  r="1.2"/>
+
+    <circle cx="40"  cy="80"  r="1.2"/><circle cx="80"  cy="80"  r="1.2"/><circle cx="120" cy="80"  r="1.2"/>
+    <circle cx="160" cy="80"  r="1.2"/><circle cx="200" cy="80"  r="1.2"/><circle cx="240" cy="80"  r="1.2"/>
+    <circle cx="280" cy="80"  r="1.2"/><circle cx="320" cy="80"  r="1.2"/><circle cx="360" cy="80"  r="1.2"/>
+    <circle cx="400" cy="80"  r="1.2"/><circle cx="440" cy="80"  r="1.2"/><circle cx="480" cy="80"  r="1.2"/>
+    <circle cx="520" cy="80"  r="1.2"/><circle cx="560" cy="80"  r="1.2"/><circle cx="600" cy="80"  r="1.2"/>
+
+    <circle cx="40"  cy="120" r="1.2"/><circle cx="80"  cy="120" r="1.2"/><circle cx="120" cy="120" r="1.2"/>
+    <circle cx="160" cy="120" r="1.2"/><circle cx="200" cy="120" r="1.2"/><circle cx="240" cy="120" r="1.2"/>
+    <circle cx="280" cy="120" r="1.2"/><circle cx="320" cy="120" r="1.2"/><circle cx="360" cy="120" r="1.2"/>
+    <circle cx="400" cy="120" r="1.2"/><circle cx="440" cy="120" r="1.2"/><circle cx="480" cy="120" r="1.2"/>
+    <circle cx="520" cy="120" r="1.2"/><circle cx="560" cy="120" r="1.2"/><circle cx="600" cy="120" r="1.2"/>
+
+    <circle cx="40"  cy="160" r="1.2"/><circle cx="80"  cy="160" r="1.2"/><circle cx="120" cy="160" r="1.2"/>
+    <circle cx="160" cy="160" r="1.2"/><circle cx="200" cy="160" r="1.2"/><circle cx="240" cy="160" r="1.2"/>
+    <circle cx="280" cy="160" r="1.2"/><circle cx="320" cy="160" r="1.2"/><circle cx="360" cy="160" r="1.2"/>
+    <circle cx="400" cy="160" r="1.2"/><circle cx="440" cy="160" r="1.2"/><circle cx="480" cy="160" r="1.2"/>
+    <circle cx="520" cy="160" r="1.2"/><circle cx="560" cy="160" r="1.2"/><circle cx="600" cy="160" r="1.2"/>
+
+    <circle cx="40"  cy="200" r="1.2"/><circle cx="80"  cy="200" r="1.2"/><circle cx="120" cy="200" r="1.2"/>
+    <circle cx="160" cy="200" r="1.2"/><circle cx="200" cy="200" r="1.2"/><circle cx="240" cy="200" r="1.2"/>
+    <circle cx="280" cy="200" r="1.2"/><circle cx="320" cy="200" r="1.2"/><circle cx="360" cy="200" r="1.2"/>
+    <circle cx="400" cy="200" r="1.2"/><circle cx="440" cy="200" r="1.2"/><circle cx="480" cy="200" r="1.2"/>
+    <circle cx="520" cy="200" r="1.2"/><circle cx="560" cy="200" r="1.2"/><circle cx="600" cy="200" r="1.2"/>
+
+    <circle cx="40"  cy="240" r="1.2"/><circle cx="80"  cy="240" r="1.2"/><circle cx="120" cy="240" r="1.2"/>
+    <circle cx="160" cy="240" r="1.2"/><circle cx="200" cy="240" r="1.2"/><circle cx="240" cy="240" r="1.2"/>
+    <circle cx="280" cy="240" r="1.2"/><circle cx="320" cy="240" r="1.2"/><circle cx="360" cy="240" r="1.2"/>
+    <circle cx="400" cy="240" r="1.2"/><circle cx="440" cy="240" r="1.2"/><circle cx="480" cy="240" r="1.2"/>
+    <circle cx="520" cy="240" r="1.2"/><circle cx="560" cy="240" r="1.2"/><circle cx="600" cy="240" r="1.2"/>
+
+    <circle cx="40"  cy="280" r="1.2"/><circle cx="80"  cy="280" r="1.2"/><circle cx="120" cy="280" r="1.2"/>
+    <circle cx="160" cy="280" r="1.2"/><circle cx="200" cy="280" r="1.2"/><circle cx="240" cy="280" r="1.2"/>
+    <circle cx="280" cy="280" r="1.2"/><circle cx="320" cy="280" r="1.2"/><circle cx="360" cy="280" r="1.2"/>
+    <circle cx="400" cy="280" r="1.2"/><circle cx="440" cy="280" r="1.2"/><circle cx="480" cy="280" r="1.2"/>
+    <circle cx="520" cy="280" r="1.2"/><circle cx="560" cy="280" r="1.2"/><circle cx="600" cy="280" r="1.2"/>
+
+    <circle cx="40"  cy="320" r="1.2"/><circle cx="80"  cy="320" r="1.2"/><circle cx="120" cy="320" r="1.2"/>
+    <circle cx="160" cy="320" r="1.2"/><circle cx="200" cy="320" r="1.2"/><circle cx="240" cy="320" r="1.2"/>
+    <circle cx="280" cy="320" r="1.2"/><circle cx="320" cy="320" r="1.2"/><circle cx="360" cy="320" r="1.2"/>
+    <circle cx="400" cy="320" r="1.2"/><circle cx="440" cy="320" r="1.2"/><circle cx="480" cy="320" r="1.2"/>
+    <circle cx="520" cy="320" r="1.2"/><circle cx="560" cy="320" r="1.2"/><circle cx="600" cy="320" r="1.2"/>
+  </g>
+
+  <!-- Muted RSS-style arcs centered -->
+  <g fill="none" stroke="#3a3a3a" stroke-linecap="round">
+    <!-- Origin dot -->
+    <circle cx="252" cy="210" r="7" fill="#3a3a3a"/>
+    <!-- Arc 1 -->
+    <path d="M252,186 A28,28 0 0,1 276,210" stroke-width="7" opacity="0.9"/>
+    <!-- Arc 2 -->
+    <path d="M252,158 A56,56 0 0,1 308,210" stroke-width="7" opacity="0.6"/>
+    <!-- Arc 3 -->
+    <path d="M252,130 A84,84 0 0,1 336,210" stroke-width="7" opacity="0.35"/>
+  </g>
+
+  <!-- Wordmark — barely visible -->
+  <text x="324" y="218"
+    font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+    font-size="13"
+    font-weight="300"
+    fill="#3d3d3d"
+    text-anchor="start"
+    letter-spacing="5">LASERFEED</text>
+
+  <!-- Thin bottom rule -->
+  <line x1="200" y1="296" x2="440" y2="296" stroke="#2a2a2a" stroke-width="1"/>
+</svg>

@@ -92,6 +92,19 @@ func (m *Manager) ForceRefresh(feedID string) {
 	}
 }
 
+// RefreshAll triggers an immediate poll for every feed that is currently running.
+func (m *Manager) RefreshAll() {
+	m.mu.Lock()
+	ids := make([]string, 0, len(m.states))
+	for id := range m.states {
+		ids = append(ids, id)
+	}
+	m.mu.Unlock()
+	for _, id := range ids {
+		m.ForceRefresh(id)
+	}
+}
+
 // ReScrapeArticles re-fetches content for all articles in a feed in the background.
 // If a rescrape is already running for this feed, it is cancelled first.
 func (m *Manager) ReScrapeArticles(feedID string) {
