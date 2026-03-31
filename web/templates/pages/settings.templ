@@ -67,6 +67,16 @@ templ SettingsPage(csrfToken string, s *settings.Settings) {
 								<img src="/static/images/laserfeed-placeholder-3.svg" alt="Minimal" loading="lazy"/>
 								<span>Minimal</span>
 							</label>
+							<label class="builtin-card builtin-card--rotate">
+								<input type="radio" name="builtin_placeholder" value="__rotate__"
+									if s.BuiltinPlaceholder == "__rotate__" { checked }/>
+								<div class="builtin-card__rotate-preview">
+									<img src="/static/images/laserfeed-placeholder.svg" alt="" loading="lazy"/>
+									<img src="/static/images/laserfeed-placeholder-2.svg" alt="" loading="lazy"/>
+									<img src="/static/images/laserfeed-placeholder-3.svg" alt="" loading="lazy"/>
+								</div>
+								<span>Rotate all</span>
+							</label>
 						</div>
 					</div>
 

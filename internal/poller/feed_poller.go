@@ -3,6 +3,7 @@ package poller
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"log/slog"
 	"strings"
 	"time"
@@ -20,6 +21,27 @@ type Stores struct {
 	Articles    article.Repository
 	FilterRules filterrule.Repository
 	Settings    settings.Repository
+	AppBaseURL  string // used to build absolute URLs for built-in placeholder images
+}
+
+// builtinSVGs is the ordered list of built-in placeholder image filenames.
+var builtinSVGs = []string{
+	"laserfeed-placeholder.svg",
+	"laserfeed-placeholder-2.svg",
+	"laserfeed-placeholder-3.svg",
+}
+
+// resolveBuiltinFile returns the SVG filename to use for a given article.
+// When file is "__rotate__" the choice is deterministic per article GUID so
+// the same article always gets the same image, but different articles are
+// spread across the available built-in images.
+func resolveBuiltinFile(file, guid string) string {
+	if file != "__rotate__" {
+		return file
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(guid))
+	return builtinSVGs[h.Sum32()%uint32(len(builtinSVGs))]
 }
 
 // scrapeParams holds the resolved scraping configuration for a single feed,
@@ -98,10 +120,15 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 	if f.PlaceholderImageURL != nil {
 		placeholderURL = *f.PlaceholderImageURL
 	}
-	// Resolve "builtin" mode: treat it as "placeholder" with the chosen built-in SVG path.
+	// For "builtin" mode the final URL is resolved per-article inside the loop
+	// (the __rotate__ option picks a different SVG per article based on GUID).
+	// Capture the builtin filename here so the loop can use it.
+	builtinFile := ""
 	if imageMode == "builtin" {
-		imageMode = "placeholder"
-		placeholderURL = "/static/images/" + globalSettings.BuiltinPlaceholder
+		builtinFile = globalSettings.BuiltinPlaceholder
+		if builtinFile == "" {
+			builtinFile = "laserfeed-placeholder.svg"
+		}
 	}
 
 	parsedFeed, err := sc.FetchFeed(ctx, f.URL, sp.userAgent)
@@ -173,7 +200,17 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		}
 
 		description := scraper.SanitizeHTML(item.Description)
-		thumbnail := scraper.ExtractThumbnail(item, description, content, imageMode, placeholderURL, guid)
+
+		// Resolve the effective imageMode and placeholderURL for this article.
+		// "builtin" is expanded here because __rotate__ needs the per-article GUID.
+		effectiveMode := imageMode
+		effectivePlaceholder := placeholderURL
+		if builtinFile != "" {
+			effectiveMode = "placeholder"
+			effectivePlaceholder = stores.AppBaseURL + "/static/images/" + resolveBuiltinFile(builtinFile, guid)
+		}
+
+		thumbnail := scraper.ExtractThumbnail(item, description, content, effectiveMode, effectivePlaceholder, guid)
 
 
 		publishedAt := time.Now()
