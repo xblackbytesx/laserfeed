@@ -58,6 +58,7 @@ func main() {
 		Articles:    articleStore,
 		FilterRules: filterRuleStore,
 		Settings:    settingsStore,
+		AppBaseURL:  cfg.AppBaseURL,
 	})
 	go pollerManager.Start()
 
