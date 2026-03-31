@@ -20,6 +20,7 @@ func NewFeedStore(db *pgxpool.Pool) *FeedStore {
 const feedCols = `id, name, url, enabled, poll_interval_seconds, user_agent,
 	scrape_full_content, scrape_method, scrape_selector, scrape_selector_type, scrape_max_age_days, scrape_cookies,
 	scrape_strip_selectors, scrape_page_strip_selectors,
+	retention_max_items, retention_max_hours,
 	image_mode, placeholder_image_url, last_polled_at, last_error, created_at, updated_at`
 
 func scanFeed(row interface{ Scan(...any) error }) (*feed.Feed, error) {
@@ -31,6 +32,7 @@ func scanFeed(row interface{ Scan(...any) error }) (*feed.Feed, error) {
 		&f.ID, &f.Name, &f.URL, &f.Enabled, &f.PollIntervalSeconds, &userAgent,
 		&f.ScrapeFullContent, &scrapeMethodStr, &scrapeSelector, &selectorTypeStr, &f.ScrapeMaxAgeDays, &scrapeCookies,
 		&scrapeStripSelectors, &scrapePageStripSelectors,
+		&f.RetentionMaxItems, &f.RetentionMaxHours,
 		&imageModeStr, &placeholderImageURL, &lastPolledAt, &lastError,
 		&f.CreatedAt, &f.UpdatedAt,
 	)
@@ -56,12 +58,14 @@ func (s *FeedStore) Create(ctx context.Context, f *feed.Feed) (*feed.Feed, error
 		`INSERT INTO feeds (name, url, enabled, poll_interval_seconds, user_agent,
 			scrape_full_content, scrape_method, scrape_selector, scrape_selector_type, scrape_max_age_days, scrape_cookies,
 			scrape_strip_selectors, scrape_page_strip_selectors,
+			retention_max_items, retention_max_hours,
 			image_mode, placeholder_image_url)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 		RETURNING `+feedCols,
 		f.Name, f.URL, f.Enabled, f.PollIntervalSeconds, f.UserAgent,
 		f.ScrapeFullContent, string(f.ScrapeMethod), f.ScrapeSelector, string(f.ScrapeSelectorType), f.ScrapeMaxAgeDays, f.ScrapeCookies,
 		f.ScrapeStripSelectors, f.ScrapePageStripSelectors,
+		f.RetentionMaxItems, f.RetentionMaxHours,
 		string(f.ImageMode), f.PlaceholderImageURL,
 	)
 	created, err := scanFeed(row)
@@ -120,13 +124,15 @@ func (s *FeedStore) Update(ctx context.Context, f *feed.Feed) (*feed.Feed, error
 			user_agent=$5, scrape_full_content=$6, scrape_method=$7, scrape_selector=$8,
 			scrape_selector_type=$9, scrape_max_age_days=$10, scrape_cookies=$11,
 			scrape_strip_selectors=$12, scrape_page_strip_selectors=$13,
-			image_mode=$14, placeholder_image_url=$15,
+			retention_max_items=$14, retention_max_hours=$15,
+			image_mode=$16, placeholder_image_url=$17,
 			updated_at=NOW()
-		WHERE id=$16
+		WHERE id=$18
 		RETURNING `+feedCols,
 		f.Name, f.URL, f.Enabled, f.PollIntervalSeconds, f.UserAgent,
 		f.ScrapeFullContent, string(f.ScrapeMethod), f.ScrapeSelector, string(f.ScrapeSelectorType), f.ScrapeMaxAgeDays, f.ScrapeCookies,
 		f.ScrapeStripSelectors, f.ScrapePageStripSelectors,
+		f.RetentionMaxItems, f.RetentionMaxHours,
 		string(f.ImageMode), f.PlaceholderImageURL, f.ID,
 	)
 	updated, err := scanFeed(row)

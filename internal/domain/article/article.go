@@ -49,6 +49,7 @@ type Repository interface {
 	ListByFeedIDs(ctx context.Context, feedIDs []string, limit, offset int) ([]*Article, error)
 	ListRecent(ctx context.Context, limit, offset int) ([]*Article, error)
 	DeleteOldest(ctx context.Context, feedID string, keepCount int) error
+	DeleteOlderThan(ctx context.Context, feedID string, maxHours int) error
 
 	UpdateScrapeResult(ctx context.Context, id, content, errMsg string) error
 	UpdateThumbnail(ctx context.Context, id, thumbnailURL string) error

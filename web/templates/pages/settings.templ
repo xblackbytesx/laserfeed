@@ -20,9 +20,9 @@ templ SettingsPage(csrfToken string, s *settings.Settings) {
 					<sl-input name="user_agent" label="Default User-Agent" value={ s.UserAgent }></sl-input>
 					<sl-input name="poll_interval_seconds" label="Default poll interval (seconds)"
 						type="number" value={ strconv.Itoa(s.PollIntervalSeconds) }></sl-input>
-					<sl-input name="max_articles_per_feed" label="Max articles kept per feed"
+					<sl-input name="max_articles_per_feed" label="Default max articles per feed"
 						type="number" value={ strconv.Itoa(s.MaxArticlesPerFeed) }
-						help-text="Oldest articles are deleted once this limit is reached"></sl-input>
+						help-text="Global default. Per-feed retention settings override this when set."></sl-input>
 				</fieldset>
 
 				<fieldset class="form-section">
