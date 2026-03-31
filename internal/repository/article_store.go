@@ -280,3 +280,14 @@ func (s *ArticleStore) DeleteOldest(ctx context.Context, feedID string, keepCoun
 	}
 	return nil
 }
+
+func (s *ArticleStore) DeleteOlderThan(ctx context.Context, feedID string, maxHours int) error {
+	_, err := s.db.Exec(ctx,
+		`DELETE FROM articles WHERE feed_id=$1 AND published_at < NOW() - ($2 * INTERVAL '1 hour')`,
+		feedID, maxHours,
+	)
+	if err != nil {
+		return fmt.Errorf("delete articles older than %d hours: %w", maxHours, err)
+	}
+	return nil
+}

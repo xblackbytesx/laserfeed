@@ -39,11 +39,13 @@ type Feed struct {
 	ScrapeMethod        ScrapeMethod
 	ScrapeSelector      *string
 	ScrapeSelectorType  SelectorType
-	ScrapeMaxAgeDays        int     // 0 = keep forever
-	ScrapeCookies           *string // raw Cookie header value, e.g. "foo=bar; baz=qux"
-	ScrapeStripSelectors    *string // newline-separated CSS selectors to remove from scraped content
+	ScrapeMaxAgeDays         int     // 0 = keep forever
+	ScrapeCookies            *string // raw Cookie header value, e.g. "foo=bar; baz=qux"
+	ScrapeStripSelectors     *string // newline-separated CSS selectors to remove from scraped content
 	ScrapePageStripSelectors *string // newline-separated CSS selectors to remove from the full page before extraction
-	ImageMode           ImageMode
+	RetentionMaxItems        int     // 0 = use global default, >0 = keep at most N articles
+	RetentionMaxHours        int     // 0 = disabled, >0 = delete articles older than N hours
+	ImageMode                ImageMode
 	PlaceholderImageURL *string
 	LastPolledAt        *time.Time
 	LastError           *string

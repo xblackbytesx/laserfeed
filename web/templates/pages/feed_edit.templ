@@ -84,6 +84,18 @@ templ FeedEdit(csrfToken string, f *feed.Feed, scrapeStats *article.ScrapeStats)
 				</fieldset>
 
 				<fieldset class="form-section">
+					<legend>Retention</legend>
+					<div class="form-grid-2">
+						<sl-input name="retention_max_items" label="Max articles kept"
+							type="number" min="0" value={ strconv.Itoa(f.RetentionMaxItems) }
+							help-text="0 = use global default. Oldest articles are deleted once this limit is reached."></sl-input>
+						<sl-input name="retention_max_hours" label="Max article age (hours)"
+							type="number" min="0" value={ strconv.Itoa(f.RetentionMaxHours) }
+							help-text="0 = no time limit. Articles older than this are deleted on each poll. Both limits can be active simultaneously."></sl-input>
+					</div>
+				</fieldset>
+
+				<fieldset class="form-section">
 					<legend>Thumbnail</legend>
 					<div class="form-grid-2">
 						<sl-select name="image_mode" value={ string(f.ImageMode) }>

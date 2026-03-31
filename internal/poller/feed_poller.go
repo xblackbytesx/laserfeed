@@ -250,9 +250,20 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		}
 	}
 
-	if globalSettings.MaxArticlesPerFeed > 0 {
-		if err := stores.Articles.DeleteOldest(ctx, feedID, globalSettings.MaxArticlesPerFeed); err != nil {
+	// Item-count retention: per-feed value overrides global when set.
+	maxItems := globalSettings.MaxArticlesPerFeed
+	if f.RetentionMaxItems > 0 {
+		maxItems = f.RetentionMaxItems
+	}
+	if maxItems > 0 {
+		if err := stores.Articles.DeleteOldest(ctx, feedID, maxItems); err != nil {
 			slog.Warn("poller: delete oldest", "feed_id", feedID, "err", err)
+		}
+	}
+	// Time-based retention: per-feed only.
+	if f.RetentionMaxHours > 0 {
+		if err := stores.Articles.DeleteOlderThan(ctx, feedID, f.RetentionMaxHours); err != nil {
+			slog.Warn("poller: delete older than", "feed_id", feedID, "hours", f.RetentionMaxHours, "err", err)
 		}
 	}
 

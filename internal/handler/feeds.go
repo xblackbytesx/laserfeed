@@ -131,12 +131,23 @@ func (h *FeedHandler) Update(c echo.Context) error {
 		scrapeMaxAge = 0
 	}
 
+	retentionMaxItems, _ := strconv.Atoi(c.FormValue("retention_max_items"))
+	if retentionMaxItems < 0 {
+		retentionMaxItems = 0
+	}
+	retentionMaxHours, _ := strconv.Atoi(c.FormValue("retention_max_hours"))
+	if retentionMaxHours < 0 {
+		retentionMaxHours = 0
+	}
+
 	f.Name = name
 	f.URL = feedURL
 	f.Enabled = c.FormValue("enabled") == "true"
 	f.PollIntervalSeconds = pollInterval
 	f.ScrapeFullContent = c.FormValue("scrape_full_content") == "true"
 	f.ScrapeMaxAgeDays = scrapeMaxAge
+	f.RetentionMaxItems = retentionMaxItems
+	f.RetentionMaxHours = retentionMaxHours
 	editImageMode := feed.ImageMode(c.FormValue("image_mode"))
 	if editImageMode == "extract" {
 		editImageMode = feed.ImageModeNone
