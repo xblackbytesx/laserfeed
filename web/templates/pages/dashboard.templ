@@ -13,7 +13,7 @@ templ Dashboard(csrfToken string, articles []*article.Article, channels []*chann
 		<div class="page-header">
 			<h1>Dashboard</h1>
 		</div>
-		<div class="dashboard-grid">
+		<div class="dashboard-grid" id="dashboard-grid">
 			<section class="channels-sidebar">
 				<h2>Channels</h2>
 				if len(channels) == 0 {
@@ -21,8 +21,12 @@ templ Dashboard(csrfToken string, articles []*article.Article, channels []*chann
 				} else {
 					<sl-card
 						class={ "channel-card", templ.KV("channel-card--active", activeChan == nil) }
-						data-href="/"
-						onclick="window.location.href=this.getAttribute('data-href')"
+						hx-get="/"
+						hx-target="#dashboard-grid"
+						hx-select="#dashboard-grid"
+						hx-swap="outerHTML"
+						hx-push-url="true"
+						hx-trigger="click"
 					>
 						<div slot="header">All content</div>
 						<div class="channel-card-body">
@@ -32,8 +36,12 @@ templ Dashboard(csrfToken string, articles []*article.Article, channels []*chann
 					for _, ch := range channels {
 						<sl-card
 							class={ "channel-card", templ.KV("channel-card--active", activeChan != nil && activeChan.ID == ch.ID) }
-							data-href={ "/?channel=" + ch.Slug }
-							onclick="window.location.href=this.getAttribute('data-href')"
+							hx-get={ "/?channel=" + ch.Slug }
+							hx-target="#dashboard-grid"
+							hx-select="#dashboard-grid"
+							hx-swap="outerHTML"
+							hx-push-url="true"
+							hx-trigger="click"
 						>
 							<div slot="header">{ ch.Name }</div>
 							<div class="channel-card-body">
