@@ -143,6 +143,12 @@ The app runs database migrations automatically on every startup, so schema upgra
 
 ---
 
+## Recommended client
+
+[**Ketchup**](https://github.com/xblackbytesx/ketchup) is the recommended Android client for LaserFeed. It is a native Jetpack Compose RSS reader designed to pair with self-hosted aggregators — point it at any of your channel feed URLs and get a clean, offline-capable reading experience on Android.
+
+---
+
 ## Feed output URLs
 
 | URL | Description |
