@@ -8,7 +8,7 @@ import (
 	"github.com/laserfeed/laserfeed/web/templates/layouts"
 )
 
-templ Dashboard(csrfToken string, articles []*article.Article, channels []*channel.Channel, page int) {
+templ Dashboard(csrfToken string, articles []*article.Article, channels []*channel.Channel, activeChan *channel.Channel, page int) {
 	@layouts.Base("Dashboard", csrfToken) {
 		<div class="page-header">
 			<h1>Dashboard</h1>
@@ -18,31 +18,55 @@ templ Dashboard(csrfToken string, articles []*article.Article, channels []*chann
 				<h2>Channels</h2>
 				if len(channels) == 0 {
 					<p class="muted">No channels yet. <a href="/channels">Create one.</a></p>
-				}
-				for _, ch := range channels {
-					<sl-card class="channel-card">
-						<div slot="header">{ ch.Name }</div>
-						<div>
-							if ch.Description != "" {
-								<p>{ ch.Description }</p>
-							}
-							<a href={ templ.SafeURL("/channels/" + ch.Slug + "/feed.rss") } target="_blank">
-								<sl-icon name="rss"></sl-icon> RSS Feed
-							</a>
+				} else {
+					<sl-card
+						class={ "channel-card", templ.KV("channel-card--active", activeChan == nil) }
+						data-href="/"
+						onclick="window.location.href=this.getAttribute('data-href')"
+					>
+						<div slot="header">All content</div>
+						<div class="channel-card-body">
+							<span class="muted small">All feeds combined</span>
 						</div>
 					</sl-card>
+					for _, ch := range channels {
+						<sl-card
+							class={ "channel-card", templ.KV("channel-card--active", activeChan != nil && activeChan.ID == ch.ID) }
+							data-href={ "/?channel=" + ch.Slug }
+							onclick="window.location.href=this.getAttribute('data-href')"
+						>
+							<div slot="header">{ ch.Name }</div>
+							<div class="channel-card-body">
+								if ch.Description != "" {
+									<p class="small">{ ch.Description }</p>
+								}
+								<a href={ templ.SafeURL("/channels/" + ch.Slug + "/feed.rss") } target="_blank" class="channel-rss-link" onclick="event.stopPropagation()">
+									<sl-icon name="rss"></sl-icon> RSS
+								</a>
+							</div>
+						</sl-card>
+					}
 				}
 			</section>
 			<section class="articles-main">
-				<h2>Recent Articles</h2>
+				<h2>
+					if activeChan != nil {
+						{ activeChan.Name }
+					} else {
+						Recent Articles
+					}
+				</h2>
 				<div class="articles-grid" id="articles-grid">
 					for _, a := range articles {
 						@components.ArticleCard(a)
 					}
+					if len(articles) == 0 {
+						<p class="muted">No articles yet.</p>
+					}
 				</div>
 				if len(articles) == 20 {
 					<div
-						hx-get={ fmt.Sprintf("/?page=%d", page+1) }
+						hx-get={ dashboardNextPageURL(activeChan, page+1) }
 						hx-trigger="revealed"
 						hx-target="#articles-grid"
 						hx-swap="beforeend"
@@ -52,4 +76,11 @@ templ Dashboard(csrfToken string, articles []*article.Article, channels []*chann
 			</section>
 		</div>
 	}
+}
+
+func dashboardNextPageURL(activeChan *channel.Channel, nextPage int) string {
+	if activeChan != nil {
+		return fmt.Sprintf("/?channel=%s&page=%d", activeChan.Slug, nextPage)
+	}
+	return fmt.Sprintf("/?page=%d", nextPage)
 }

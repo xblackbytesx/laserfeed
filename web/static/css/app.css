@@ -248,7 +248,33 @@ body {
   letter-spacing: .05em;
 }
 
-.channel-card { margin-bottom: .75rem; }
+.channel-card {
+  display: block;
+  margin-bottom: .75rem;
+  cursor: pointer;
+  transition: box-shadow .15s ease;
+}
+.channel-card::part(base) {
+  border: 2px solid transparent;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.channel-card:hover::part(base) {
+  box-shadow: 0 4px 16px rgba(0,0,0,.35);
+}
+.channel-card--active::part(base) {
+  border-color: var(--sl-color-primary-500);
+}
+.channel-card-body { display: flex; flex-direction: column; gap: .4rem; }
+.channel-card-body .small { margin: 0; }
+.channel-rss-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  font-size: .8rem;
+  color: var(--color-muted);
+  text-decoration: none;
+}
+.channel-rss-link:hover { color: var(--sl-color-primary-500); }
 
 /* ================================================================
  *  Articles grid
