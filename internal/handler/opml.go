@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/laserfeed/laserfeed/internal/domain/channel"
 	"github.com/laserfeed/laserfeed/internal/domain/feed"
 )
@@ -53,7 +53,7 @@ func feedOutline(f *feed.Feed) opmlOutline {
 }
 
 // ExportOPML streams feeds (grouped by channel) as a downloadable OPML file.
-func (h *SettingsHandler) ExportOPML(c echo.Context) error {
+func (h *SettingsHandler) ExportOPML(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	feeds, err := h.feeds.List(ctx)
@@ -124,11 +124,11 @@ func (h *SettingsHandler) ExportOPML(c echo.Context) error {
 	c.Response().Header().Set("Content-Disposition", "attachment; filename="+filename)
 	c.Response().Header().Set("Content-Type", "application/xml; charset=utf-8")
 
-	if _, err := io.WriteString(c.Response().Writer, `<?xml version="1.0" encoding="UTF-8"?>`+"\n"); err != nil {
+	if _, err := io.WriteString(c.Response(), `<?xml version="1.0" encoding="UTF-8"?>`+"\n"); err != nil {
 		slog.Error("opml export: write xml declaration", "err", err)
 		return nil
 	}
-	enc := xml.NewEncoder(c.Response().Writer)
+	enc := xml.NewEncoder(c.Response())
 	enc.Indent("", "  ")
 	if err := enc.Encode(doc); err != nil {
 		slog.Error("opml export: encode xml", "err", err)
@@ -190,7 +190,7 @@ func slugifyOPML(s string) string {
 
 // ImportOPML creates feeds (and optionally channels) from an uploaded OPML file.
 // Existing feeds matched by URL are not overwritten — OPML carries no config.
-func (h *SettingsHandler) ImportOPML(c echo.Context) error {
+func (h *SettingsHandler) ImportOPML(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	file, err := c.FormFile("opml_file")

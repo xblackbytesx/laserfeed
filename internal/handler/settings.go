@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/laserfeed/laserfeed/internal/domain/channel"
 	"github.com/laserfeed/laserfeed/internal/domain/feed"
 	"github.com/laserfeed/laserfeed/internal/domain/filterrule"
@@ -32,16 +32,16 @@ func NewSettingsHandler(
 	return &SettingsHandler{settings: s, feeds: f, filterRules: fr, channels: ch, poller: pm}
 }
 
-func (h *SettingsHandler) Get(c echo.Context) error {
+func (h *SettingsHandler) Get(c *echo.Context) error {
 	s, err := h.settings.Get(c.Request().Context())
 	if err != nil {
 		slog.Error("get settings", "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load settings")
 	}
-	return pages.SettingsPage(csrfToken(c), s).Render(c.Request().Context(), c.Response().Writer)
+	return pages.SettingsPage(csrfToken(c), s).Render(c.Request().Context(), c.Response())
 }
 
-func (h *SettingsHandler) Post(c echo.Context) error {
+func (h *SettingsHandler) Post(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	pollInterval, err := strconv.Atoi(c.FormValue("poll_interval_seconds"))

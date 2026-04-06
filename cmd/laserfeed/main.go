@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/gorilla/csrf"
-	"github.com/labstack/echo/v4"
-	echomiddleware "github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	echomiddleware "github.com/labstack/echo/v5/middleware"
 	"github.com/laserfeed/laserfeed/internal/config"
 	appdb "github.com/laserfeed/laserfeed/internal/db"
 	"github.com/laserfeed/laserfeed/internal/handler"
@@ -70,13 +70,12 @@ func main() {
 	feedOutHandler := handler.NewFeedOutHandler(channelStore, articleStore, feedStore, cfg.AppBaseURL)
 
 	e := echo.New()
-	e.HideBanner = true
 	e.Use(echomiddleware.Recover())
 	e.Use(appmiddleware.Logger())
 	e.Use(appmiddleware.HXTitle())
 
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			h := c.Response().Header()
 			h.Set("X-Content-Type-Options", "nosniff")
 			h.Set("X-Frame-Options", "DENY")
@@ -104,7 +103,7 @@ func main() {
 	)
 	e.Use(echo.WrapMiddleware(csrfMiddleware))
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			c.Set("csrf", csrf.Token(c.Request()))
 			return next(c)
 		}
@@ -113,7 +112,7 @@ func main() {
 	e.Static("/static", "web/static")
 
 	// Health check (no CSRF needed)
-	e.GET("/health", func(c echo.Context) error {
+	e.GET("/health", func(c *echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 
@@ -153,6 +152,9 @@ func main() {
 	e.GET("/settings/export/opml", settingsHandler.ExportOPML)
 	e.POST("/settings/import/opml", settingsHandler.ImportOPML)
 
+	addr := ":" + cfg.Port
+	srv := &http.Server{Addr: addr, Handler: e}
+
 	go func() {
 		sig := make(chan os.Signal, 1)
 		signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
@@ -161,12 +163,11 @@ func main() {
 		cancel()
 		shutCtx, shutCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutCancel()
-		_ = e.Shutdown(shutCtx)
+		_ = srv.Shutdown(shutCtx)
 	}()
 
-	addr := ":" + cfg.Port
 	slog.Info("starting server", "addr", addr, "secure_cookies", cfg.SecureCookies)
-	if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("server error", "err", err)
 	}
 }

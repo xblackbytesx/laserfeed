@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/laserfeed/laserfeed/internal/domain/channel"
 	"github.com/laserfeed/laserfeed/internal/domain/feed"
 	"github.com/laserfeed/laserfeed/internal/domain/filterrule"
@@ -56,7 +56,7 @@ type backupChannel struct {
 const maxImportSize = 5 << 20 // 5 MB
 
 // Export streams the full configuration as a downloadable JSON file.
-func (h *SettingsHandler) Export(c echo.Context) error {
+func (h *SettingsHandler) Export(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	feeds, err := h.feeds.List(ctx)
@@ -132,7 +132,7 @@ func (h *SettingsHandler) Export(c echo.Context) error {
 	c.Response().Header().Set("Content-Disposition", "attachment; filename="+filename)
 	c.Response().Header().Set("Content-Type", "application/json; charset=utf-8")
 
-	enc := json.NewEncoder(c.Response().Writer)
+	enc := json.NewEncoder(c.Response())
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(doc); err != nil {
 		slog.Error("export: encode json", "err", err)
@@ -141,7 +141,7 @@ func (h *SettingsHandler) Export(c echo.Context) error {
 }
 
 // Import upserts feeds (matched by URL) and channels (matched by slug) from a backup file.
-func (h *SettingsHandler) Import(c echo.Context) error {
+func (h *SettingsHandler) Import(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	file, err := c.FormFile("backup_file")
