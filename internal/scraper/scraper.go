@@ -12,7 +12,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/antchfx/htmlquery"
-	readability "github.com/go-shiori/go-readability"
+	readability "codeberg.org/readeck/go-readability/v2"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/mmcdole/gofeed"
 )
@@ -237,7 +237,11 @@ func readabilityExtract(body []byte, pageURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("readability extract: %w", err)
 	}
-	return unwrapReadability(article.Content), nil
+	var buf bytes.Buffer
+	if err := article.RenderHTML(&buf); err != nil {
+		return "", fmt.Errorf("readability render: %w", err)
+	}
+	return unwrapReadability(buf.String()), nil
 }
 
 // unwrapReadability cleans up go-readability output for feed embedding:

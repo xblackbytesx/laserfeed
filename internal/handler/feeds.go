@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/laserfeed/laserfeed/internal/domain/article"
 	"github.com/laserfeed/laserfeed/internal/domain/feed"
 	"github.com/laserfeed/laserfeed/internal/domain/filterrule"
@@ -26,16 +26,16 @@ func NewFeedHandler(feeds feed.Repository, articles article.Repository, rules fi
 	return &FeedHandler{feeds: feeds, articles: articles, rules: rules, poller: pm}
 }
 
-func (h *FeedHandler) List(c echo.Context) error {
+func (h *FeedHandler) List(c *echo.Context) error {
 	feeds, err := h.feeds.List(c.Request().Context())
 	if err != nil {
 		slog.Error("list feeds", "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load feeds")
 	}
-	return pages.FeedList(csrfToken(c), feeds).Render(c.Request().Context(), c.Response().Writer)
+	return pages.FeedList(csrfToken(c), feeds).Render(c.Request().Context(), c.Response())
 }
 
-func (h *FeedHandler) Create(c echo.Context) error {
+func (h *FeedHandler) Create(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	feedURL := strings.TrimSpace(c.FormValue("url"))
@@ -83,7 +83,7 @@ func (h *FeedHandler) Create(c echo.Context) error {
 	return redirect(c, "/feeds")
 }
 
-func (h *FeedHandler) Edit(c echo.Context) error {
+func (h *FeedHandler) Edit(c *echo.Context) error {
 	ctx := c.Request().Context()
 	f, err := h.feeds.GetByID(ctx, c.Param("id"))
 	if err != nil {
@@ -98,10 +98,10 @@ func (h *FeedHandler) Edit(c echo.Context) error {
 		}
 	}
 
-	return pages.FeedEdit(csrfToken(c), f, stats).Render(ctx, c.Response().Writer)
+	return pages.FeedEdit(csrfToken(c), f, stats).Render(ctx, c.Response())
 }
 
-func (h *FeedHandler) Update(c echo.Context) error {
+func (h *FeedHandler) Update(c *echo.Context) error {
 	ctx := c.Request().Context()
 	f, err := h.feeds.GetByID(ctx, c.Param("id"))
 	if err != nil {
@@ -228,7 +228,7 @@ func (h *FeedHandler) Update(c echo.Context) error {
 	return redirect(c, "/feeds/"+f.ID+"/edit")
 }
 
-func (h *FeedHandler) Delete(c echo.Context) error {
+func (h *FeedHandler) Delete(c *echo.Context) error {
 	id := c.Param("id")
 	h.poller.StopFeed(id)
 	if err := h.feeds.Delete(c.Request().Context(), id); err != nil {
@@ -238,17 +238,17 @@ func (h *FeedHandler) Delete(c echo.Context) error {
 	return redirect(c, "/feeds")
 }
 
-func (h *FeedHandler) Refresh(c echo.Context) error {
+func (h *FeedHandler) Refresh(c *echo.Context) error {
 	h.poller.ForceRefresh(c.Param("id"))
 	return redirect(c, "/feeds")
 }
 
-func (h *FeedHandler) RefreshAll(c echo.Context) error {
+func (h *FeedHandler) RefreshAll(c *echo.Context) error {
 	h.poller.RefreshAll()
 	return redirect(c, "/feeds")
 }
 
-func (h *FeedHandler) Preview(c echo.Context) error {
+func (h *FeedHandler) Preview(c *echo.Context) error {
 	ctx := c.Request().Context()
 	f, err := h.feeds.GetByID(ctx, c.Param("id"))
 	if err != nil {
@@ -270,11 +270,11 @@ func (h *FeedHandler) Preview(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load filter rules")
 	}
 
-	return pages.FeedPreview(csrfToken(c), f, arts, filterRules, showRaw).Render(ctx, c.Response().Writer)
+	return pages.FeedPreview(csrfToken(c), f, arts, filterRules, showRaw).Render(ctx, c.Response())
 }
 
 // Scrape triggers a background re-scrape of all articles for this feed.
-func (h *FeedHandler) Scrape(c echo.Context) error {
+func (h *FeedHandler) Scrape(c *echo.Context) error {
 	id := c.Param("id")
 	f, err := h.feeds.GetByID(c.Request().Context(), id)
 	if err != nil {
@@ -288,7 +288,7 @@ func (h *FeedHandler) Scrape(c echo.Context) error {
 }
 
 // PurgeScrape clears all scraped content for this feed.
-func (h *FeedHandler) PurgeScrape(c echo.Context) error {
+func (h *FeedHandler) PurgeScrape(c *echo.Context) error {
 	ctx := c.Request().Context()
 	id := c.Param("id")
 	if err := h.articles.PurgeScrapeContent(ctx, id); err != nil {

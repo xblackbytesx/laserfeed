@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/laserfeed/laserfeed/internal/domain/channel"
 	"github.com/laserfeed/laserfeed/internal/domain/feed"
 	"github.com/laserfeed/laserfeed/web/templates/pages"
@@ -23,16 +23,16 @@ func NewChannelHandler(channels channel.Repository, feeds feed.Repository) *Chan
 	return &ChannelHandler{channels: channels, feeds: feeds}
 }
 
-func (h *ChannelHandler) List(c echo.Context) error {
+func (h *ChannelHandler) List(c *echo.Context) error {
 	chans, err := h.channels.List(c.Request().Context())
 	if err != nil {
 		slog.Error("list channels", "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channels")
 	}
-	return pages.ChannelList(csrfToken(c), chans).Render(c.Request().Context(), c.Response().Writer)
+	return pages.ChannelList(csrfToken(c), chans).Render(c.Request().Context(), c.Response())
 }
 
-func (h *ChannelHandler) Create(c echo.Context) error {
+func (h *ChannelHandler) Create(c *echo.Context) error {
 	name, slug, desc, err := validateChannelFields(c)
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func (h *ChannelHandler) Create(c echo.Context) error {
 	return redirect(c, "/channels")
 }
 
-func (h *ChannelHandler) Edit(c echo.Context) error {
+func (h *ChannelHandler) Edit(c *echo.Context) error {
 	ctx := c.Request().Context()
 	ch, err := h.channels.GetByID(ctx, c.Param("id"))
 	if err != nil {
@@ -61,10 +61,10 @@ func (h *ChannelHandler) Edit(c echo.Context) error {
 		slog.Error("list all feeds for channel edit", "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load feeds")
 	}
-	return pages.ChannelEdit(csrfToken(c), ch, channelFeeds, allFeeds).Render(ctx, c.Response().Writer)
+	return pages.ChannelEdit(csrfToken(c), ch, channelFeeds, allFeeds).Render(ctx, c.Response())
 }
 
-func (h *ChannelHandler) Update(c echo.Context) error {
+func (h *ChannelHandler) Update(c *echo.Context) error {
 	ctx := c.Request().Context()
 	ch, err := h.channels.GetByID(ctx, c.Param("id"))
 	if err != nil {
@@ -84,7 +84,7 @@ func (h *ChannelHandler) Update(c echo.Context) error {
 	return redirect(c, "/channels/"+ch.ID+"/edit")
 }
 
-func (h *ChannelHandler) Delete(c echo.Context) error {
+func (h *ChannelHandler) Delete(c *echo.Context) error {
 	if err := h.channels.Delete(c.Request().Context(), c.Param("id")); err != nil {
 		slog.Error("delete channel", "channel_id", c.Param("id"), "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete channel")
@@ -92,7 +92,7 @@ func (h *ChannelHandler) Delete(c echo.Context) error {
 	return redirect(c, "/channels")
 }
 
-func (h *ChannelHandler) AddFeed(c echo.Context) error {
+func (h *ChannelHandler) AddFeed(c *echo.Context) error {
 	ctx := c.Request().Context()
 	channelID := c.Param("id")
 	feedID := strings.TrimSpace(c.FormValue("feed_id"))
@@ -110,10 +110,10 @@ func (h *ChannelHandler) AddFeed(c echo.Context) error {
 		slog.Error("list channel feeds after add", "channel_id", channelID, "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channel feeds")
 	}
-	return pages.ChannelFeedsList(csrfToken(c), channelID, channelFeeds).Render(ctx, c.Response().Writer)
+	return pages.ChannelFeedsList(csrfToken(c), channelID, channelFeeds).Render(ctx, c.Response())
 }
 
-func (h *ChannelHandler) RemoveFeed(c echo.Context) error {
+func (h *ChannelHandler) RemoveFeed(c *echo.Context) error {
 	ctx := c.Request().Context()
 	channelID := c.Param("id")
 	feedID := c.Param("fid")
@@ -128,10 +128,10 @@ func (h *ChannelHandler) RemoveFeed(c echo.Context) error {
 		slog.Error("list channel feeds after remove", "channel_id", channelID, "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channel feeds")
 	}
-	return pages.ChannelFeedsList(csrfToken(c), channelID, channelFeeds).Render(ctx, c.Response().Writer)
+	return pages.ChannelFeedsList(csrfToken(c), channelID, channelFeeds).Render(ctx, c.Response())
 }
 
-func validateChannelFields(c echo.Context) (name, slug, desc string, err error) {
+func validateChannelFields(c *echo.Context) (name, slug, desc string, err error) {
 	name = strings.TrimSpace(c.FormValue("name"))
 	if name == "" {
 		return "", "", "", echo.NewHTTPError(http.StatusBadRequest, "name is required")

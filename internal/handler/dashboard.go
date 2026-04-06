@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/laserfeed/laserfeed/internal/domain/article"
 	"github.com/laserfeed/laserfeed/internal/domain/channel"
 	"github.com/laserfeed/laserfeed/web/templates/pages"
@@ -20,7 +20,7 @@ func NewDashboardHandler(articles article.Repository, channels channel.Repositor
 	return &DashboardHandler{articles: articles, channels: channels}
 }
 
-func (h *DashboardHandler) Get(c echo.Context) error {
+func (h *DashboardHandler) Get(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	page, _ := strconv.Atoi(c.QueryParam("page"))
@@ -72,5 +72,5 @@ func (h *DashboardHandler) Get(c echo.Context) error {
 		}
 	}
 
-	return pages.Dashboard(csrfToken(c), arts, chans, activeChan, page).Render(ctx, c.Response().Writer)
+	return pages.Dashboard(csrfToken(c), arts, chans, activeChan, page).Render(ctx, c.Response())
 }

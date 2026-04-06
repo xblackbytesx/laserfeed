@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/laserfeed/laserfeed/internal/domain/feed"
 	"github.com/laserfeed/laserfeed/internal/domain/filterrule"
 	"github.com/laserfeed/laserfeed/web/templates/pages"
@@ -20,7 +20,7 @@ func NewRulesHandler(feeds feed.Repository, rules filterrule.Repository) *RulesH
 	return &RulesHandler{feeds: feeds, rules: rules}
 }
 
-func (h *RulesHandler) List(c echo.Context) error {
+func (h *RulesHandler) List(c *echo.Context) error {
 	ctx := c.Request().Context()
 	feedID := c.Param("id")
 
@@ -35,10 +35,10 @@ func (h *RulesHandler) List(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load filter rules")
 	}
 
-	return pages.RulesPage(csrfToken(c), f, rules).Render(ctx, c.Response().Writer)
+	return pages.RulesPage(csrfToken(c), f, rules).Render(ctx, c.Response())
 }
 
-func (h *RulesHandler) Create(c echo.Context) error {
+func (h *RulesHandler) Create(c *echo.Context) error {
 	ctx := c.Request().Context()
 	feedID := c.Param("id")
 
@@ -81,10 +81,10 @@ func (h *RulesHandler) Create(c echo.Context) error {
 		slog.Error("list filter rules after create", "feed_id", feedID, "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load filter rules")
 	}
-	return pages.RulesList(csrfToken(c), feedID, rules).Render(ctx, c.Response().Writer)
+	return pages.RulesList(csrfToken(c), feedID, rules).Render(ctx, c.Response())
 }
 
-func (h *RulesHandler) Delete(c echo.Context) error {
+func (h *RulesHandler) Delete(c *echo.Context) error {
 	ctx := c.Request().Context()
 	feedID := c.Param("id")
 	ruleID := c.Param("rid")
@@ -99,5 +99,5 @@ func (h *RulesHandler) Delete(c echo.Context) error {
 		slog.Error("list filter rules after delete", "feed_id", feedID, "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load filter rules")
 	}
-	return pages.RulesList(csrfToken(c), feedID, rules).Render(ctx, c.Response().Writer)
+	return pages.RulesList(csrfToken(c), feedID, rules).Render(ctx, c.Response())
 }

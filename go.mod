@@ -1,23 +1,21 @@
 module github.com/laserfeed/laserfeed
 
-go 1.24.0
-
-toolchain go1.24.13
+go 1.26.1
 
 require (
-	github.com/PuerkitoBio/goquery v1.11.0
+	codeberg.org/readeck/go-readability/v2 v2.1.1
+	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/a-h/templ v0.3.1001
 	github.com/antchfx/htmlquery v1.3.6
-	github.com/go-shiori/go-readability v0.0.0-20251205110129-5db1dc9836f0
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/csrf v1.7.3
-	github.com/jackc/pgx/v5 v5.8.0
-	github.com/labstack/echo/v4 v4.15.1
+	github.com/jackc/pgx/v5 v5.9.1
+	github.com/labstack/echo/v5 v5.1.0
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/mmcdole/gofeed v1.3.0
-	golang.org/x/crypto v0.48.0
-	golang.org/x/net v0.50.0
+	golang.org/x/crypto v0.49.0
+	golang.org/x/net v0.52.0
 )
 
 require (
@@ -48,8 +46,8 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 )

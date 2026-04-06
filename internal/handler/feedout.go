@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/laserfeed/laserfeed/internal/atom"
 	"github.com/laserfeed/laserfeed/internal/domain/article"
 	"github.com/laserfeed/laserfeed/internal/domain/channel"
@@ -22,7 +22,7 @@ func NewFeedOutHandler(channels channel.Repository, articles article.Repository,
 	return &FeedOutHandler{channels: channels, articles: articles, feeds: feeds, appBaseURL: appBaseURL}
 }
 
-func (h *FeedOutHandler) ChannelFeed(c echo.Context) error {
+func (h *FeedOutHandler) ChannelFeed(c *echo.Context) error {
 	ctx := c.Request().Context()
 	slug := c.Param("slug")
 
@@ -59,7 +59,7 @@ func (h *FeedOutHandler) ChannelFeed(c echo.Context) error {
 	return c.Blob(http.StatusOK, "application/atom+xml; charset=utf-8", atomBytes)
 }
 
-func (h *FeedOutHandler) AllFeed(c echo.Context) error {
+func (h *FeedOutHandler) AllFeed(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	arts, err := h.articles.ListRecent(ctx, 100, 0)

@@ -1,6 +1,6 @@
 package middleware
 
-import "github.com/labstack/echo/v4"
+import "github.com/labstack/echo/v5"
 
 // pageTitles maps Echo route patterns to human-readable page titles.
 // Only GET routes that render a full page are listed; redirects and
@@ -20,7 +20,7 @@ var pageTitles = map[string]string{
 // browser tab title stays correct during boost-powered navigation.
 func HXTitle() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			if c.Request().Header.Get("HX-Request") == "true" {
 				if title, ok := pageTitles[c.Path()]; ok {
 					c.Response().Header().Set("HX-Title", title+" — LaserFeed")
