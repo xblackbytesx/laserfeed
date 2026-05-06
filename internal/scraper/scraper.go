@@ -3,8 +3,10 @@ package scraper
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -16,6 +18,51 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/mmcdole/gofeed"
 )
+
+// ErrPrivateAddress is returned by the dialer when a feed/article URL resolves
+// to a non-routable destination (loopback, private, link-local, etc.). This
+// prevents a malicious feed from probing internal services on the host network.
+var ErrPrivateAddress = errors.New("scraper: refusing to connect to private address")
+
+// isPrivateIP reports whether ip is in any range we refuse to dial.
+// We block: loopback, link-local, multicast, unspecified, private (RFC1918,
+// RFC4193, IPv4 carrier-grade NAT 100.64.0.0/10), and the AWS/GCP/Azure
+// metadata IPv4 169.254.169.254 (covered by link-local).
+func isPrivateIP(ip net.IP) bool {
+	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsInterfaceLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() ||
+		ip.IsPrivate() {
+		return true
+	}
+	// IPv4 carrier-grade NAT — not covered by net.IP.IsPrivate.
+	if v4 := ip.To4(); v4 != nil && v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127 {
+		return true
+	}
+	return false
+}
+
+// safeDialContext wraps a net.Dialer so connections to private addresses are
+// rejected after DNS resolution but before the TCP connect.
+func safeDialContext(d *net.Dialer) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		ips, err := d.Resolver.LookupIP(ctx, "ip", host)
+		if err != nil {
+			return nil, err
+		}
+		for _, ip := range ips {
+			if isPrivateIP(ip) {
+				return nil, fmt.Errorf("%w: %s resolves to %s", ErrPrivateAddress, host, ip)
+			}
+		}
+		// Use the first non-private IP to avoid TOCTOU between our check and
+		// the dialer's own resolution.
+		return d.DialContext(ctx, network, net.JoinHostPort(ips[0].String(), port))
+	}
+}
 
 const maxBodySize = 5 * 1024 * 1024 // 5MB
 
@@ -51,11 +98,19 @@ type Scraper struct {
 }
 
 func New() *Scraper {
+	dialer := &net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 30 * time.Second,
+		Resolver:  net.DefaultResolver,
+	}
 	transport := &http.Transport{
-		MaxIdleConns:        50,
-		MaxIdleConnsPerHost: 5,
-		MaxConnsPerHost:     10,
-		IdleConnTimeout:     90 * time.Second,
+		DialContext:           safeDialContext(dialer),
+		MaxIdleConns:          50,
+		MaxIdleConnsPerHost:   5,
+		MaxConnsPerHost:       10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
 	}
 	return &Scraper{
 		client: &http.Client{
@@ -141,7 +196,9 @@ func (s *Scraper) ScrapeContent(ctx context.Context, articleURL, userAgent, meth
 		if err != nil {
 			return "", err
 		}
-		combined := append(pageStripSelectors, stripSelectors...)
+		combined := make([]string, 0, len(pageStripSelectors)+len(stripSelectors))
+		combined = append(combined, pageStripSelectors...)
+		combined = append(combined, stripSelectors...)
 		if len(combined) > 0 {
 			if stripped, err := applyStripSelectors(raw, combined); err == nil {
 				raw = stripped
@@ -265,8 +322,8 @@ func unwrapReadability(html string) string {
 	})
 	// Remove empty divs (contain only whitespace). Walk bottom-up so nested
 	// empty divs collapse correctly — a parent becomes empty once its empty
-	// children are removed.
-	for {
+	// children are removed. Iteration capped to avoid pathological loops.
+	for i := 0; i < 50; i++ {
 		removed := false
 		doc.Find("div").Each(func(_ int, s *goquery.Selection) {
 			if strings.TrimSpace(s.Text()) == "" && s.Find("img, video, audio, iframe, svg").Length() == 0 {

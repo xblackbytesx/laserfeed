@@ -9,7 +9,7 @@ templ ChannelList(csrfToken string, channels []*channel.Channel) {
 	@layouts.Base("Channels", csrfToken) {
 		<div class="page-header">
 			<h1>Channels</h1>
-			<sl-button variant="primary" onclick="document.getElementById('add-channel-dialog').show()">
+			<sl-button variant="primary" data-dialog-open="add-channel-dialog">
 				<sl-icon slot="prefix" name="plus-circle"></sl-icon>
 				New Channel
 			</sl-button>
@@ -23,7 +23,7 @@ templ ChannelList(csrfToken string, channels []*channel.Channel) {
 					help-text="Lowercase letters, numbers, and hyphens. Used in the RSS URL: /channels/tech-news/feed.rss"></sl-input>
 				<sl-textarea name="description" label="Description" placeholder="Optional description" rows="2"></sl-textarea>
 				<div class="dialog-footer">
-					<sl-button onclick="document.getElementById('add-channel-dialog').hide()" variant="neutral">Cancel</sl-button>
+					<sl-button data-dialog-close="add-channel-dialog" variant="neutral">Cancel</sl-button>
 					<sl-button type="submit" variant="primary">
 						<sl-icon slot="prefix" name="plus-circle"></sl-icon>
 						Create Channel
@@ -60,7 +60,7 @@ templ ChannelList(csrfToken string, channels []*channel.Channel) {
 								</sl-button>
 							</a>
 							<form method="POST" action={ templ.SafeURL("/channels/" + ch.ID + "/delete") } style="display:inline"
-								onsubmit="return confirm('Delete this channel?')">
+								data-confirm="Delete this channel?">
 								<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
 								<sl-button size="small" variant="danger" type="submit">
 									<sl-icon name="trash"></sl-icon>

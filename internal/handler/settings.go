@@ -79,10 +79,21 @@ func (h *SettingsHandler) Post(c *echo.Context) error {
 
 	builtin := c.FormValue("builtin_placeholder")
 	switch builtin {
-	case "laserfeed-placeholder.svg", "laserfeed-placeholder-2.svg", "laserfeed-placeholder-3.svg", "__rotate__":
+	case "":
+		builtin = "laserfeed-placeholder.svg"
+	case "laserfeed-placeholder.svg",
+		"laserfeed-placeholder-2.svg",
+		"laserfeed-placeholder-3.svg",
+		"laserfeed-placeholder-4.svg",
+		"laserfeed-placeholder-5.svg",
+		"laserfeed-placeholder-6.svg",
+		"laserfeed-placeholder-7.svg",
+		"laserfeed-placeholder-8.svg",
+		"laserfeed-placeholder-9.svg",
+		"__rotate__":
 		// valid
 	default:
-		builtin = "laserfeed-placeholder.svg"
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid builtin placeholder")
 	}
 
 	pairs := map[string]string{

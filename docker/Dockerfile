@@ -12,21 +12,17 @@ RUN npm install --prefix ./web && \
     cp web/node_modules/htmx.org/dist/htmx.min.js web/static/vendor/htmx.min.js && \
     rm -rf web/node_modules
 
-# Download Go dependencies (cached layer — only re-runs when go.mod changes)
-COPY go.mod ./
+# Download Go dependencies (cached layer — re-runs only when go.mod/go.sum change).
+# Copying the committed go.sum lets `go mod download` verify checksums against it,
+# rather than silently accepting whatever resolves at build time.
+COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source (go.sum excluded by .dockerignore so the downloaded one is preserved)
+# Copy source.
 COPY . .
 
-# Generate templ files first — web/templates/pages/*.go must exist before
-# go mod tidy can recognise the package as local (not a missing remote module).
 RUN go install github.com/a-h/templ/cmd/templ@v0.3.1001 && \
     templ generate
-
-# Tidy ensures go.sum is complete for every package actually imported in source,
-# guarding against stale cached go mod download layers.
-RUN go mod tidy
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o laserfeed ./cmd/laserfeed
 

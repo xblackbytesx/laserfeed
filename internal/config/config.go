@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
+	"strconv"
 )
 
 type Config struct {
@@ -15,12 +17,24 @@ type Config struct {
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		DatabaseURL:   os.Getenv("DATABASE_URL"),
-		CSRFAuthKey:   os.Getenv("CSRF_AUTH_KEY"),
-		AppBaseURL:    os.Getenv("APP_BASE_URL"),
-		Port:          os.Getenv("PORT"),
-		SecureCookies: os.Getenv("SECURE_COOKIES") != "false",
+		DatabaseURL: os.Getenv("DATABASE_URL"),
+		CSRFAuthKey: os.Getenv("CSRF_AUTH_KEY"),
+		AppBaseURL:  os.Getenv("APP_BASE_URL"),
+		Port:        os.Getenv("PORT"),
 	}
+
+	// Default to true; reject typos like "False" or "0" rather than silently
+	// flipping to insecure cookies (or vice versa).
+	if raw := os.Getenv("SECURE_COOKIES"); raw == "" {
+		cfg.SecureCookies = true
+	} else {
+		v, err := strconv.ParseBool(raw)
+		if err != nil {
+			return nil, fmt.Errorf("SECURE_COOKIES must be a boolean (true/false), got %q", raw)
+		}
+		cfg.SecureCookies = v
+	}
+
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
@@ -32,6 +46,9 @@ func Load() (*Config, error) {
 	}
 	if cfg.AppBaseURL == "" {
 		cfg.AppBaseURL = "http://localhost:8080"
+	}
+	if u, err := url.Parse(cfg.AppBaseURL); err != nil || u.Scheme == "" || u.Host == "" {
+		return nil, fmt.Errorf("APP_BASE_URL must be a fully-qualified URL (got %q)", cfg.AppBaseURL)
 	}
 	if cfg.Port == "" {
 		cfg.Port = "8080"

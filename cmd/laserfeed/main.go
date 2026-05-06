@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -80,7 +81,7 @@ func main() {
 			h.Set("X-Content-Type-Options", "nosniff")
 			h.Set("X-Frame-Options", "DENY")
 			h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-			h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src * data:; font-src 'self' data:")
+			h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src * data:; font-src 'self' data:")
 			if cfg.SecureCookies {
 				h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
 			}
@@ -111,8 +112,13 @@ func main() {
 
 	e.Static("/static", "web/static")
 
-	// Health check (no CSRF needed)
+	// Readiness check: verifies the DB pool is reachable. (No CSRF needed.)
 	e.GET("/health", func(c *echo.Context) error {
+		pingCtx, cancel := context.WithTimeout(c.Request().Context(), 2*time.Second)
+		defer cancel()
+		if err := pool.Ping(pingCtx); err != nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]string{"status": "unhealthy", "error": "database"})
+		}
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 
@@ -153,21 +159,41 @@ func main() {
 	e.POST("/settings/import/opml", settingsHandler.ImportOPML)
 
 	addr := ":" + cfg.Port
-	srv := &http.Server{Addr: addr, Handler: e}
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           e,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
+
+	serverErrCh := make(chan error, 1)
 	go func() {
-		sig := make(chan os.Signal, 1)
-		signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT)
-		<-sig
-		slog.Info("shutting down...")
-		cancel()
-		shutCtx, shutCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer shutCancel()
-		_ = srv.Shutdown(shutCtx)
+		slog.Info("starting server", "addr", addr, "secure_cookies", cfg.SecureCookies)
+		serverErrCh <- srv.ListenAndServe()
 	}()
 
-	slog.Info("starting server", "addr", addr, "secure_cookies", cfg.SecureCookies)
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		slog.Error("server error", "err", err)
+	select {
+	case <-sig:
+		slog.Info("shutting down...")
+	case err := <-serverErrCh:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("server error", "err", err)
+		}
 	}
+
+	shutCtx, shutCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutCancel()
+	if err := srv.Shutdown(shutCtx); err != nil {
+		slog.Warn("server shutdown", "err", err)
+	}
+	// Cancel root context after HTTP drain so in-flight handlers had a chance
+	// to commit their DB work, then wait for poller goroutines before main()
+	// exits and the deferred pool.Close runs.
+	cancel()
+	pollerManager.Wait()
 }

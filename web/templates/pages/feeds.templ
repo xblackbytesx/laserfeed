@@ -17,7 +17,7 @@ templ FeedList(csrfToken string, feeds []*feed.Feed) {
 						Refresh All
 					</sl-button>
 				</form>
-				<sl-button variant="primary" onclick="document.getElementById('add-feed-dialog').show()">
+				<sl-button variant="primary" data-dialog-open="add-feed-dialog">
 					<sl-icon slot="prefix" name="plus-circle"></sl-icon>
 					Add Feed
 				</sl-button>
@@ -44,7 +44,7 @@ templ FeedList(csrfToken string, feeds []*feed.Feed) {
 					</sl-select>
 				</div>
 				<div class="dialog-footer">
-					<sl-button onclick="document.getElementById('add-feed-dialog').hide()" variant="neutral">Cancel</sl-button>
+					<sl-button data-dialog-close="add-feed-dialog" variant="neutral">Cancel</sl-button>
 					<sl-button type="submit" variant="primary">
 						<sl-icon slot="prefix" name="plus-circle"></sl-icon>
 						Add Feed
@@ -102,7 +102,7 @@ templ FeedRow(csrfToken string, f *feed.Feed) {
 					</sl-button>
 				</form>
 				<form method="POST" action={ templ.SafeURL("/feeds/" + f.ID + "/delete") } style="display:inline"
-					onsubmit="return confirm('Delete this feed and all its articles?')">
+					data-confirm="Delete this feed and all its articles?">
 					<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
 					<sl-button size="small" variant="danger" type="submit">
 						<sl-icon name="trash"></sl-icon>

@@ -48,7 +48,7 @@ templ Dashboard(csrfToken string, articles []*article.Article, channels []*chann
 								if ch.Description != "" {
 									<p class="small">{ ch.Description }</p>
 								}
-								<a href={ templ.SafeURL("/channels/" + ch.Slug + "/feed.rss") } target="_blank" class="channel-rss-link" onclick="event.stopPropagation()">
+								<a href={ templ.SafeURL("/channels/" + ch.Slug + "/feed.rss") } target="_blank" class="channel-rss-link" data-stop-propagation>
 									<sl-icon name="rss"></sl-icon> RSS
 								</a>
 							</div>

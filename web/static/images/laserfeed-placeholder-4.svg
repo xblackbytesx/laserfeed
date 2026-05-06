@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <defs>
+    <radialGradient id="bg4" cx="50%" cy="50%" r="75%">
+      <stop offset="0%" stop-color="#1a0a18"/>
+      <stop offset="100%" stop-color="#06030a"/>
+    </radialGradient>
+    <filter id="pulse-glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="pulse-soft">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="640" height="360" fill="url(#bg4)"/>
+
+  <!-- Sparse vertical scan ticks -->
+  <g stroke="#3a1133" stroke-width="1" opacity="0.4">
+    <line x1="80"  y1="60" x2="80"  y2="300"/>
+    <line x1="160" y1="60" x2="160" y2="300"/>
+    <line x1="240" y1="60" x2="240" y2="300"/>
+    <line x1="320" y1="60" x2="320" y2="300"/>
+    <line x1="400" y1="60" x2="400" y2="300"/>
+    <line x1="480" y1="60" x2="480" y2="300"/>
+    <line x1="560" y1="60" x2="560" y2="300"/>
+  </g>
+
+  <!-- Baseline -->
+  <line x1="20" y1="180" x2="620" y2="180" stroke="#4a1538" stroke-width="1" opacity="0.5"/>
+
+  <!-- Pulse waveform — glow layer -->
+  <polyline
+    points="20,180 220,180 260,180 270,160 282,210 296,90 312,260 330,180 360,180 410,180 430,170 460,180 620,180"
+    fill="none" stroke="#ff2d8a" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"
+    opacity="0.4" filter="url(#pulse-glow)"/>
+
+  <!-- Pulse waveform — core line -->
+  <polyline
+    points="20,180 220,180 260,180 270,160 282,210 296,90 312,260 330,180 360,180 410,180 430,170 460,180 620,180"
+    fill="none" stroke="#ff5fa8" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+
+  <!-- Spike origin marker -->
+  <circle cx="296" cy="90" r="4" fill="#ffffff" filter="url(#pulse-soft)"/>
+  <circle cx="296" cy="90" r="2" fill="#ffffff"/>
+
+  <!-- BPM-style readout -->
+  <text x="40" y="76"
+    font-family="'Courier New', Courier, monospace"
+    font-size="12" font-weight="bold"
+    fill="#ff5fa8" opacity="0.7" letter-spacing="2">PULSE · 01</text>
+  <text x="40" y="94"
+    font-family="'Courier New', Courier, monospace"
+    font-size="22" font-weight="bold"
+    fill="#ff2d8a" filter="url(#pulse-soft)" letter-spacing="1">128 BPM</text>
+
+  <!-- Wordmark -->
+  <text x="320" y="338"
+    font-family="'Courier New', Courier, monospace"
+    font-size="16" font-weight="bold"
+    fill="#cc1f6e" text-anchor="middle"
+    letter-spacing="9" opacity="0.75">LASERFEED</text>
+</svg>

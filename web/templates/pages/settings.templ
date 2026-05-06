@@ -67,6 +67,42 @@ templ SettingsPage(csrfToken string, s *settings.Settings) {
 								<img src="/static/images/laserfeed-placeholder-3.svg" alt="Minimal" loading="lazy"/>
 								<span>Minimal</span>
 							</label>
+							<label class="builtin-card">
+								<input type="radio" name="builtin_placeholder" value="laserfeed-placeholder-4.svg"
+									if s.BuiltinPlaceholder == "laserfeed-placeholder-4.svg" { checked }/>
+								<img src="/static/images/laserfeed-placeholder-4.svg" alt="Pulse" loading="lazy"/>
+								<span>Pulse</span>
+							</label>
+							<label class="builtin-card">
+								<input type="radio" name="builtin_placeholder" value="laserfeed-placeholder-5.svg"
+									if s.BuiltinPlaceholder == "laserfeed-placeholder-5.svg" { checked }/>
+								<img src="/static/images/laserfeed-placeholder-5.svg" alt="Orbit" loading="lazy"/>
+								<span>Orbit</span>
+							</label>
+							<label class="builtin-card">
+								<input type="radio" name="builtin_placeholder" value="laserfeed-placeholder-6.svg"
+									if s.BuiltinPlaceholder == "laserfeed-placeholder-6.svg" { checked }/>
+								<img src="/static/images/laserfeed-placeholder-6.svg" alt="Spectrum" loading="lazy"/>
+								<span>Spectrum</span>
+							</label>
+							<label class="builtin-card">
+								<input type="radio" name="builtin_placeholder" value="laserfeed-placeholder-7.svg"
+									if s.BuiltinPlaceholder == "laserfeed-placeholder-7.svg" { checked }/>
+								<img src="/static/images/laserfeed-placeholder-7.svg" alt="Aperture" loading="lazy"/>
+								<span>Aperture</span>
+							</label>
+							<label class="builtin-card">
+								<input type="radio" name="builtin_placeholder" value="laserfeed-placeholder-8.svg"
+									if s.BuiltinPlaceholder == "laserfeed-placeholder-8.svg" { checked }/>
+								<img src="/static/images/laserfeed-placeholder-8.svg" alt="Constellation" loading="lazy"/>
+								<span>Constellation</span>
+							</label>
+							<label class="builtin-card">
+								<input type="radio" name="builtin_placeholder" value="laserfeed-placeholder-9.svg"
+									if s.BuiltinPlaceholder == "laserfeed-placeholder-9.svg" { checked }/>
+								<img src="/static/images/laserfeed-placeholder-9.svg" alt="Sweep" loading="lazy"/>
+								<span>Sweep</span>
+							</label>
 							<label class="builtin-card builtin-card--rotate">
 								<input type="radio" name="builtin_placeholder" value="__rotate__"
 									if s.BuiltinPlaceholder == "__rotate__" { checked }/>
@@ -74,25 +110,18 @@ templ SettingsPage(csrfToken string, s *settings.Settings) {
 									<img src="/static/images/laserfeed-placeholder.svg" alt="" loading="lazy"/>
 									<img src="/static/images/laserfeed-placeholder-2.svg" alt="" loading="lazy"/>
 									<img src="/static/images/laserfeed-placeholder-3.svg" alt="" loading="lazy"/>
+									<img src="/static/images/laserfeed-placeholder-4.svg" alt="" loading="lazy"/>
+									<img src="/static/images/laserfeed-placeholder-5.svg" alt="" loading="lazy"/>
+									<img src="/static/images/laserfeed-placeholder-6.svg" alt="" loading="lazy"/>
+									<img src="/static/images/laserfeed-placeholder-7.svg" alt="" loading="lazy"/>
+									<img src="/static/images/laserfeed-placeholder-8.svg" alt="" loading="lazy"/>
+									<img src="/static/images/laserfeed-placeholder-9.svg" alt="" loading="lazy"/>
 								</div>
 								<span>Rotate all</span>
 							</label>
 						</div>
 					</div>
 
-					<script>
-					(function() {
-						function syncMode(val) {
-							document.getElementById('custom-placeholder-section').style.display =
-								val === 'placeholder' ? '' : 'none';
-							document.getElementById('builtin-placeholder-section').style.display =
-								val === 'builtin' ? '' : 'none';
-						}
-						var sel = document.getElementById('image-mode-select');
-						syncMode(sel.value);
-						sel.addEventListener('sl-change', function() { syncMode(sel.value); });
-					})();
-					</script>
 				</fieldset>
 
 				<div class="form-actions">
