@@ -30,6 +30,12 @@ var builtinSVGs = []string{
 	"laserfeed-placeholder.svg",
 	"laserfeed-placeholder-2.svg",
 	"laserfeed-placeholder-3.svg",
+	"laserfeed-placeholder-4.svg",
+	"laserfeed-placeholder-5.svg",
+	"laserfeed-placeholder-6.svg",
+	"laserfeed-placeholder-7.svg",
+	"laserfeed-placeholder-8.svg",
+	"laserfeed-placeholder-9.svg",
 }
 
 // resolveBuiltinFile returns the SVG filename to use for a given article.

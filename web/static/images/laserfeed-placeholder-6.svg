@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <defs>
+    <linearGradient id="bg6" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#06140a"/>
+      <stop offset="100%" stop-color="#020806"/>
+    </linearGradient>
+    <linearGradient id="bar-grad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%"  stop-color="#0d6b30" stop-opacity="0.95"/>
+      <stop offset="60%" stop-color="#22d36a" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#a3ffbf" stop-opacity="1"/>
+    </linearGradient>
+    <filter id="spectrum-glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="caps-glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="640" height="360" fill="url(#bg6)"/>
+
+  <!-- dB scale ticks (left) -->
+  <g font-family="'Courier New', Courier, monospace" font-size="9" fill="#22d36a" opacity="0.5">
+    <text x="22" y="78"  text-anchor="end">  0</text>
+    <text x="22" y="138" text-anchor="end">-12</text>
+    <text x="22" y="198" text-anchor="end">-24</text>
+    <text x="22" y="258" text-anchor="end">-36</text>
+    <text x="22" y="298" text-anchor="end">-48</text>
+  </g>
+  <g stroke="#1a4a26" stroke-width="0.6" opacity="0.5" stroke-dasharray="2 3">
+    <line x1="36" y1="75"  x2="616" y2="75"/>
+    <line x1="36" y1="135" x2="616" y2="135"/>
+    <line x1="36" y1="195" x2="616" y2="195"/>
+    <line x1="36" y1="255" x2="616" y2="255"/>
+    <line x1="36" y1="295" x2="616" y2="295"/>
+  </g>
+
+  <!-- Bars: 24 vertical bars across the width (heights vary) -->
+  <!-- Bar geometry: x starts at 50, each bar is 18 wide with 6 gap (24px stride) -->
+  <g filter="url(#spectrum-glow)" opacity="0.95">
+    <rect x="50"  y="220" width="18" height="80"  fill="url(#bar-grad)" rx="2"/>
+    <rect x="74"  y="180" width="18" height="120" fill="url(#bar-grad)" rx="2"/>
+    <rect x="98"  y="140" width="18" height="160" fill="url(#bar-grad)" rx="2"/>
+    <rect x="122" y="100" width="18" height="200" fill="url(#bar-grad)" rx="2"/>
+    <rect x="146" y="155" width="18" height="145" fill="url(#bar-grad)" rx="2"/>
+    <rect x="170" y="120" width="18" height="180" fill="url(#bar-grad)" rx="2"/>
+    <rect x="194" y="85"  width="18" height="215" fill="url(#bar-grad)" rx="2"/>
+    <rect x="218" y="65"  width="18" height="235" fill="url(#bar-grad)" rx="2"/>
+    <rect x="242" y="95"  width="18" height="205" fill="url(#bar-grad)" rx="2"/>
+    <rect x="266" y="125" width="18" height="175" fill="url(#bar-grad)" rx="2"/>
+    <rect x="290" y="160" width="18" height="140" fill="url(#bar-grad)" rx="2"/>
+    <rect x="314" y="115" width="18" height="185" fill="url(#bar-grad)" rx="2"/>
+    <rect x="338" y="150" width="18" height="150" fill="url(#bar-grad)" rx="2"/>
+    <rect x="362" y="190" width="18" height="110" fill="url(#bar-grad)" rx="2"/>
+    <rect x="386" y="170" width="18" height="130" fill="url(#bar-grad)" rx="2"/>
+    <rect x="410" y="135" width="18" height="165" fill="url(#bar-grad)" rx="2"/>
+    <rect x="434" y="180" width="18" height="120" fill="url(#bar-grad)" rx="2"/>
+    <rect x="458" y="215" width="18" height="85"  fill="url(#bar-grad)" rx="2"/>
+    <rect x="482" y="195" width="18" height="105" fill="url(#bar-grad)" rx="2"/>
+    <rect x="506" y="225" width="18" height="75"  fill="url(#bar-grad)" rx="2"/>
+    <rect x="530" y="245" width="18" height="55"  fill="url(#bar-grad)" rx="2"/>
+    <rect x="554" y="225" width="18" height="75"  fill="url(#bar-grad)" rx="2"/>
+    <rect x="578" y="255" width="18" height="45"  fill="url(#bar-grad)" rx="2"/>
+    <rect x="602" y="270" width="14" height="30"  fill="url(#bar-grad)" rx="2"/>
+  </g>
+
+  <!-- Peak-hold caps -->
+  <g fill="#a3ffbf" filter="url(#caps-glow)">
+    <rect x="50"  y="206" width="18" height="2" rx="1"/>
+    <rect x="74"  y="166" width="18" height="2" rx="1"/>
+    <rect x="98"  y="126" width="18" height="2" rx="1"/>
+    <rect x="122" y="86"  width="18" height="2" rx="1"/>
+    <rect x="146" y="141" width="18" height="2" rx="1"/>
+    <rect x="170" y="106" width="18" height="2" rx="1"/>
+    <rect x="194" y="71"  width="18" height="2" rx="1"/>
+    <rect x="218" y="51"  width="18" height="2" rx="1"/>
+    <rect x="242" y="81"  width="18" height="2" rx="1"/>
+    <rect x="266" y="111" width="18" height="2" rx="1"/>
+    <rect x="290" y="146" width="18" height="2" rx="1"/>
+    <rect x="314" y="101" width="18" height="2" rx="1"/>
+    <rect x="338" y="136" width="18" height="2" rx="1"/>
+    <rect x="362" y="176" width="18" height="2" rx="1"/>
+    <rect x="386" y="156" width="18" height="2" rx="1"/>
+    <rect x="410" y="121" width="18" height="2" rx="1"/>
+    <rect x="434" y="166" width="18" height="2" rx="1"/>
+    <rect x="458" y="201" width="18" height="2" rx="1"/>
+    <rect x="482" y="181" width="18" height="2" rx="1"/>
+    <rect x="506" y="211" width="18" height="2" rx="1"/>
+    <rect x="530" y="231" width="18" height="2" rx="1"/>
+    <rect x="554" y="211" width="18" height="2" rx="1"/>
+    <rect x="578" y="241" width="18" height="2" rx="1"/>
+    <rect x="602" y="256" width="14" height="2" rx="1"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="320" y="338"
+    font-family="'Courier New', Courier, monospace"
+    font-size="16" font-weight="bold"
+    fill="#1a8b3a" text-anchor="middle"
+    letter-spacing="9" opacity="0.7">LASERFEED</text>
+</svg>
