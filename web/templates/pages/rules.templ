@@ -19,7 +19,7 @@ templ RulesPage(csrfToken string, f *feed.Feed, rules []*filterrule.FilterRule) 
 				hx-target="#rules-list"
 				hx-swap="innerHTML"
 				hx-select="unset"
-				hx-on::after-request="this.reset()"
+				data-reset-on-success
 			>
 				<div class="form-row">
 					<sl-select name="rule_type" label="Type" value="blacklist">

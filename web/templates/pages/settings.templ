@@ -80,19 +80,6 @@ templ SettingsPage(csrfToken string, s *settings.Settings) {
 						</div>
 					</div>
 
-					<script>
-					(function() {
-						function syncMode(val) {
-							document.getElementById('custom-placeholder-section').style.display =
-								val === 'placeholder' ? '' : 'none';
-							document.getElementById('builtin-placeholder-section').style.display =
-								val === 'builtin' ? '' : 'none';
-						}
-						var sel = document.getElementById('image-mode-select');
-						syncMode(sel.value);
-						sel.addEventListener('sl-change', function() { syncMode(sel.value); });
-					})();
-					</script>
 				</fieldset>
 
 				<div class="form-actions">

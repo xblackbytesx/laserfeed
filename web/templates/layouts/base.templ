@@ -14,7 +14,6 @@ templ Base(title string, csrfToken string) {
 			<script src="/static/vendor/htmx.min.js" defer></script>
 		</head>
 		<body class="sl-theme-dark"
-			hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` }
 			hx-boost="true"
 			hx-select="#main-content"
 			hx-target="#main-content"
