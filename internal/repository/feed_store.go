@@ -17,11 +17,11 @@ func NewFeedStore(db *pgxpool.Pool) *FeedStore {
 	return &FeedStore{db: db}
 }
 
-const feedCols = `id, name, url, enabled, poll_interval_seconds, user_agent,
-	scrape_full_content, scrape_method, scrape_selector, scrape_selector_type, scrape_max_age_days, scrape_cookies,
-	scrape_strip_selectors, scrape_page_strip_selectors,
-	retention_max_items, retention_max_hours,
-	image_mode, placeholder_image_url, last_polled_at, last_error, created_at, updated_at`
+const feedCols = `feeds.id, feeds.name, feeds.url, feeds.enabled, feeds.poll_interval_seconds, feeds.user_agent,
+	feeds.scrape_full_content, feeds.scrape_method, feeds.scrape_selector, feeds.scrape_selector_type, feeds.scrape_max_age_days, feeds.scrape_cookies,
+	feeds.scrape_strip_selectors, feeds.scrape_page_strip_selectors,
+	feeds.retention_max_items, feeds.retention_max_hours,
+	feeds.image_mode, feeds.placeholder_image_url, feeds.last_polled_at, feeds.last_error, feeds.created_at, feeds.updated_at`
 
 func scanFeed(row interface{ Scan(...any) error }) (*feed.Feed, error) {
 	f := &feed.Feed{}

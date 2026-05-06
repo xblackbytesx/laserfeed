@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -57,7 +58,10 @@ func (h *FeedHandler) Create(c *echo.Context) error {
 	}
 
 	imageMode := feed.ImageMode(c.FormValue("image_mode"))
-	if imageMode == "" || imageMode == "extract" {
+	switch imageMode {
+	case feed.ImageModeNone, feed.ImageModePlaceholder, feed.ImageModeRandom, feed.ImageModeBuiltin:
+		// valid
+	default:
 		imageMode = feed.ImageModeRandom
 	}
 
@@ -164,45 +168,21 @@ func (h *FeedHandler) Update(c *echo.Context) error {
 	}
 	f.ScrapeSelectorType = selectorType
 
-	if ua := strings.TrimSpace(c.FormValue("user_agent")); ua != "" {
-		if len(ua) > 500 {
-			return echo.NewHTTPError(http.StatusBadRequest, "user agent must be 500 characters or fewer")
-		}
-		f.UserAgent = &ua
-	} else {
-		f.UserAgent = nil
+	var perr error
+	if f.UserAgent, perr = optionalStr(c, "user_agent", 500); perr != nil {
+		return perr
 	}
-	if sel := strings.TrimSpace(c.FormValue("scrape_selector")); sel != "" {
-		if len(sel) > 1000 {
-			return echo.NewHTTPError(http.StatusBadRequest, "scrape selector must be 1000 characters or fewer")
-		}
-		f.ScrapeSelector = &sel
-	} else {
-		f.ScrapeSelector = nil
+	if f.ScrapeSelector, perr = optionalStr(c, "scrape_selector", 1000); perr != nil {
+		return perr
 	}
-	if ck := strings.TrimSpace(c.FormValue("scrape_cookies")); ck != "" {
-		if len(ck) > 8192 {
-			return echo.NewHTTPError(http.StatusBadRequest, "cookie header must be 8192 characters or fewer")
-		}
-		f.ScrapeCookies = &ck
-	} else {
-		f.ScrapeCookies = nil
+	if f.ScrapeCookies, perr = optionalStr(c, "scrape_cookies", 8192); perr != nil {
+		return perr
 	}
-	if raw := strings.TrimSpace(c.FormValue("scrape_strip_selectors")); raw != "" {
-		if len(raw) > 4096 {
-			return echo.NewHTTPError(http.StatusBadRequest, "content strip selectors must be 4096 characters or fewer")
-		}
-		f.ScrapeStripSelectors = &raw
-	} else {
-		f.ScrapeStripSelectors = nil
+	if f.ScrapeStripSelectors, perr = optionalStr(c, "scrape_strip_selectors", 4096); perr != nil {
+		return perr
 	}
-	if raw := strings.TrimSpace(c.FormValue("scrape_page_strip_selectors")); raw != "" {
-		if len(raw) > 4096 {
-			return echo.NewHTTPError(http.StatusBadRequest, "page strip selectors must be 4096 characters or fewer")
-		}
-		f.ScrapePageStripSelectors = &raw
-	} else {
-		f.ScrapePageStripSelectors = nil
+	if f.ScrapePageStripSelectors, perr = optionalStr(c, "scrape_page_strip_selectors", 4096); perr != nil {
+		return perr
 	}
 	if ph := strings.TrimSpace(c.FormValue("placeholder_image_url")); ph != "" {
 		if err := validateFeedURL(ph); err != nil {
@@ -296,6 +276,19 @@ func (h *FeedHandler) PurgeScrape(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to purge content")
 	}
 	return redirect(c, "/feeds/"+id+"/edit")
+}
+
+// optionalStr reads a form field as a trimmed *string: empty (or whitespace-only)
+// becomes nil; non-empty is bounds-checked and returned as a heap pointer.
+func optionalStr(c *echo.Context, field string, maxLen int) (*string, error) {
+	v := strings.TrimSpace(c.FormValue(field))
+	if v == "" {
+		return nil, nil
+	}
+	if len(v) > maxLen {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("%s must be %d characters or fewer", field, maxLen))
+	}
+	return &v, nil
 }
 
 func validateFeedURL(rawURL string) error {

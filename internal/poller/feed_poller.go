@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
@@ -131,16 +132,20 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		}
 	}
 
-	parsedFeed, err := sc.FetchFeed(ctx, f.URL, sp.userAgent)
 	now := time.Now()
+	parsedFeed, err := sc.FetchFeed(ctx, f.URL, sp.userAgent)
 	if err != nil {
 		errStr := err.Error()
-		_ = stores.Feeds.UpdatePollStatus(ctx, feedID, now, &errStr)
+		if statusErr := stores.Feeds.UpdatePollStatus(ctx, feedID, now, &errStr); statusErr != nil {
+			slog.Warn("poller: persist fetch error status", "feed_id", feedID, "err", statusErr)
+		}
 		slog.Error("poller: fetch feed", "feed_id", feedID, "url", f.URL, "err", err)
 		return
 	}
 
-	_ = stores.Feeds.UpdatePollStatus(ctx, feedID, now, nil)
+	if err := stores.Feeds.UpdatePollStatus(ctx, feedID, now, nil); err != nil {
+		slog.Warn("poller: persist ok status", "feed_id", feedID, "err", err)
+	}
 
 	rules, err := stores.FilterRules.ListByFeedID(ctx, feedID)
 	if err != nil {
@@ -207,13 +212,18 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		effectivePlaceholder := placeholderURL
 		if builtinFile != "" {
 			effectiveMode = "placeholder"
-			effectivePlaceholder = stores.AppBaseURL + "/static/images/" + resolveBuiltinFile(builtinFile, guid)
+			joined, joinErr := url.JoinPath(stores.AppBaseURL, "/static/images/", resolveBuiltinFile(builtinFile, guid))
+			if joinErr == nil {
+				effectivePlaceholder = joined
+			} else {
+				slog.Warn("poller: build builtin placeholder url", "err", joinErr)
+				effectivePlaceholder = stores.AppBaseURL + "/static/images/" + resolveBuiltinFile(builtinFile, guid)
+			}
 		}
 
 		thumbnail := scraper.ExtractThumbnail(item, description, content, effectiveMode, effectivePlaceholder, guid)
 
-
-		publishedAt := time.Now()
+		publishedAt := now
 		if item.PublishedParsed != nil {
 			publishedAt = *item.PublishedParsed
 		}

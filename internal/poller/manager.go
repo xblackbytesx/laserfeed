@@ -18,12 +18,13 @@ type feedPollState struct {
 }
 
 type Manager struct {
-	mu         sync.Mutex
-	states     map[string]*feedPollState
-	scraping   map[string]*scrapeState // tracks active ReScrapeArticles goroutines
-	stores     Stores
-	scraper    *scraper.Scraper
-	rootCtx    context.Context
+	mu       sync.Mutex
+	states   map[string]*feedPollState
+	scraping map[string]*scrapeState // tracks active ReScrapeArticles goroutines
+	stores   Stores
+	scraper  *scraper.Scraper
+	rootCtx  context.Context
+	wg       sync.WaitGroup
 }
 
 type scrapeState struct {
@@ -38,6 +39,13 @@ func NewManager(ctx context.Context, stores Stores) *Manager {
 		stores:   stores,
 		scraper:  scraper.New(),
 	}
+}
+
+// Wait blocks until every goroutine spawned by the manager has returned.
+// Call after cancelling the root context during shutdown to give in-flight
+// poll cycles a chance to commit their writes.
+func (m *Manager) Wait() {
+	m.wg.Wait()
 }
 
 func (m *Manager) Start() {
@@ -64,7 +72,11 @@ func (m *Manager) StartFeed(f *feed.Feed) {
 
 	m.states[f.ID] = &feedPollState{cancel: cancel, refreshCh: refreshCh}
 
-	go m.runFeedLoop(fctx, f.ID, refreshCh)
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		m.runFeedLoop(fctx, f.ID, refreshCh)
+	}()
 }
 
 func (m *Manager) StopFeed(feedID string) {
@@ -117,7 +129,9 @@ func (m *Manager) ReScrapeArticles(feedID string) {
 	m.scraping[feedID] = ss
 	m.mu.Unlock()
 
+	m.wg.Add(1)
 	go func() {
+		defer m.wg.Done()
 		defer func() {
 			m.mu.Lock()
 			// Only clean up if we're still the active rescrape.

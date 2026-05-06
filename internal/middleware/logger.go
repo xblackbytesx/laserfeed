@@ -21,7 +21,7 @@ func Logger() echo.MiddlewareFunc {
 			}
 			slog.Info("request",
 				"method", c.Request().Method,
-				"path", c.Request().URL.Path,
+				"path", c.Request().URL.RequestURI(),
 				"status", status,
 				"duration", time.Since(start),
 			)

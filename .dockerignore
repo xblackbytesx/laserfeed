@@ -5,9 +5,6 @@ web/static/vendor/
 # Go build output
 tmp/
 
-# Generated during Docker build — do not overwrite the freshly generated one
-go.sum
-
 # Generated files — recreated during Docker build
 *_templ.go
 
