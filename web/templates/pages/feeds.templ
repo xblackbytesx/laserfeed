@@ -1,11 +1,13 @@
 package pages
 
 import (
+	"strconv"
+
 	"github.com/laserfeed/laserfeed/internal/domain/feed"
 	"github.com/laserfeed/laserfeed/web/templates/layouts"
 )
 
-templ FeedList(csrfToken string, feeds []*feed.Feed) {
+templ FeedList(csrfToken string, feeds []*feed.Feed, errorCount int, onlyErrors bool) {
 	@layouts.Base("Feed Pool", csrfToken) {
 		<div class="page-header">
 			<h1>Feed Pool</h1>
@@ -23,11 +25,28 @@ templ FeedList(csrfToken string, feeds []*feed.Feed) {
 				</sl-button>
 			</div>
 		</div>
+		if errorCount > 0 || onlyErrors {
+			<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem">
+				if errorCount > 0 {
+					<sl-badge variant="danger" pill>{ strconv.Itoa(errorCount) }</sl-badge>
+					<span class="muted small">need attention</span>
+				}
+				<div style="margin-left:auto;display:flex;gap:.25rem">
+					if onlyErrors {
+						<sl-button size="small" href="/feeds">All feeds</sl-button>
+						<sl-button size="small" variant="danger" disabled>Errors only</sl-button>
+					} else {
+						<sl-button size="small" variant="primary" disabled>All feeds</sl-button>
+						<sl-button size="small" variant="danger" href="/feeds?filter=errors">Errors only</sl-button>
+					}
+				</div>
+			</div>
+		}
 		<sl-dialog label="Add Feed Source" id="add-feed-dialog">
 			<form method="POST" action="/feeds" class="dialog-form">
 				<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
-				<sl-input name="name" label="Name" required placeholder="Hacker News"></sl-input>
-				<sl-input name="url" label="Feed URL" required type="url" placeholder="https://hnrss.org/frontpage"></sl-input>
+				<sl-input name="name" label="Name" placeholder="Hacker News" help-text="Optional — taken from the feed if left blank"></sl-input>
+				<sl-input name="url" label="Feed or site URL" required type="url" placeholder="https://news.ycombinator.com" help-text="Paste a feed URL, or a site homepage to auto-discover its feed"></sl-input>
 				<div class="form-row">
 					<sl-input name="poll_interval_seconds" label="Poll interval (s)" type="number" value="3600" style="flex:1"></sl-input>
 					<sl-select name="image_mode" value="random" style="flex:1">
@@ -52,7 +71,14 @@ templ FeedList(csrfToken string, feeds []*feed.Feed) {
 				</div>
 			</form>
 		</sl-dialog>
-		if len(feeds) == 0 {
+		if len(feeds) == 0 && onlyErrors {
+			<sl-card>
+				<div class="empty-state">
+					<sl-icon name="check-circle" style="font-size:2rem;color:var(--color-muted)"></sl-icon>
+					<p>No feeds with errors. <a href="/feeds">Show all feeds</a>.</p>
+				</div>
+			</sl-card>
+		} else if len(feeds) == 0 {
 			<sl-card>
 				<div class="empty-state">
 					<sl-icon name="rss" style="font-size:2rem;color:var(--color-muted)"></sl-icon>

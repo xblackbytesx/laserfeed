@@ -58,6 +58,11 @@ func resolveBuiltinFile(file, guid string) string {
 // opening an unbounded number of outbound connections.
 const maxConcurrentScrapes = 4
 
+// pollTimeout is a generous outer backstop on a single poll cycle so a wedged
+// DB operation or stuck connection cannot pin a feed goroutine indefinitely.
+// The feed fetch (30s) and per-article scrape (15s) keep their own tighter limits.
+const pollTimeout = 5 * time.Minute
+
 // redactURLUserinfo strips any user:password@ component from a URL before it is
 // logged. Feed URLs are validated to reject credentials on input, but this is
 // defense-in-depth so a credential can never leak into the logs.
@@ -123,6 +128,9 @@ func resolveScrapeParams(f *feed.Feed, globalUA string) scrapeParams {
 }
 
 func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scraper) {
+	ctx, cancel := context.WithTimeout(ctx, pollTimeout)
+	defer cancel()
+
 	f, err := stores.Feeds.GetByID(ctx, feedID)
 	if err != nil {
 		slog.Error("poller: get feed", "feed_id", feedID, "err", err)
@@ -158,7 +166,7 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 	}
 
 	now := time.Now()
-	parsedFeed, err := sc.FetchFeed(ctx, f.URL, sp.userAgent)
+	result, err := sc.FetchFeed(ctx, f.URL, sp.userAgent, f.PollETag, f.PollLastModified)
 	if err != nil {
 		errStr := err.Error()
 		if statusErr := stores.Feeds.UpdatePollStatus(ctx, feedID, now, &errStr); statusErr != nil {
@@ -171,6 +179,20 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 	if err := stores.Feeds.UpdatePollStatus(ctx, feedID, now, nil); err != nil {
 		slog.Warn("poller: persist ok status", "feed_id", feedID, "err", err)
 	}
+
+	// Conditional GET: nothing changed since last poll — skip re-ingesting items,
+	// but still run retention so time-based cleanup keeps happening.
+	if result.NotModified {
+		slog.Debug("poller: feed not modified", "feed_id", feedID)
+		runRetention(ctx, f, stores, globalSettings)
+		return
+	}
+
+	// Store fresh validators for the next conditional request.
+	if err := stores.Feeds.UpdatePollValidators(ctx, feedID, result.ETag, result.LastModified); err != nil {
+		slog.Warn("poller: persist validators", "feed_id", feedID, "err", err)
+	}
+	parsedFeed := result.Feed
 
 	rules, err := stores.FilterRules.ListByFeedID(ctx, feedID)
 	if err != nil {
@@ -315,28 +337,34 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		}
 	}
 
+	runRetention(ctx, f, stores, globalSettings)
+
+	slog.Info("poller: done", "feed_id", feedID, "items", len(parsedFeed.Items))
+}
+
+// runRetention applies a feed's content-purge and article-retention policies.
+// Safe to call on every poll, including 304 (not-modified) cycles.
+func runRetention(ctx context.Context, f *feed.Feed, stores Stores, gs *settings.Settings) {
 	if f.ScrapeFullContent && f.ScrapeMaxAgeDays > 0 {
-		if err := stores.Articles.PurgeOldScrapeContent(ctx, feedID, f.ScrapeMaxAgeDays); err != nil {
-			slog.Warn("poller: purge old scrape content", "feed_id", feedID, "err", err)
+		if err := stores.Articles.PurgeOldScrapeContent(ctx, f.ID, f.ScrapeMaxAgeDays); err != nil {
+			slog.Warn("poller: purge old scrape content", "feed_id", f.ID, "err", err)
 		}
 	}
 
 	// Item-count retention: per-feed value overrides global when set.
-	maxItems := globalSettings.MaxArticlesPerFeed
+	maxItems := gs.MaxArticlesPerFeed
 	if f.RetentionMaxItems > 0 {
 		maxItems = f.RetentionMaxItems
 	}
 	if maxItems > 0 {
-		if err := stores.Articles.DeleteOldest(ctx, feedID, maxItems); err != nil {
-			slog.Warn("poller: delete oldest", "feed_id", feedID, "err", err)
+		if err := stores.Articles.DeleteOldest(ctx, f.ID, maxItems); err != nil {
+			slog.Warn("poller: delete oldest", "feed_id", f.ID, "err", err)
 		}
 	}
 	// Time-based retention: per-feed only.
 	if f.RetentionMaxHours > 0 {
-		if err := stores.Articles.DeleteOlderThan(ctx, feedID, f.RetentionMaxHours); err != nil {
-			slog.Warn("poller: delete older than", "feed_id", feedID, "hours", f.RetentionMaxHours, "err", err)
+		if err := stores.Articles.DeleteOlderThan(ctx, f.ID, f.RetentionMaxHours); err != nil {
+			slog.Warn("poller: delete older than", "feed_id", f.ID, "hours", f.RetentionMaxHours, "err", err)
 		}
 	}
-
-	slog.Info("poller: done", "feed_id", feedID, "items", len(parsedFeed.Items))
 }

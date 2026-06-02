@@ -13,13 +13,19 @@ func TestAtomCacheGetSet(t *testing.T) {
 	}
 
 	body := []byte("<feed/>")
-	c.set("tech", body)
+	stored := c.set("tech", body)
+	if stored.etag == "" {
+		t.Fatal("set should compute an ETag")
+	}
 	got, ok := c.get("tech")
 	if !ok {
 		t.Fatal("expected hit after set")
 	}
-	if string(got) != string(body) {
-		t.Fatalf("got %q, want %q", got, body)
+	if string(got.body) != string(body) {
+		t.Fatalf("body: got %q, want %q", got.body, body)
+	}
+	if got.etag != stored.etag {
+		t.Fatalf("etag: got %q, want %q", got.etag, stored.etag)
 	}
 }
 
@@ -40,5 +46,21 @@ func TestAtomCacheKeysDoNotCollide(t *testing.T) {
 	// alphanumeric+hyphen), so the keys must differ.
 	if allFeedCacheKey == "all" {
 		t.Fatal("all-feed cache key collides with a valid channel slug")
+	}
+}
+
+func TestComputeETag(t *testing.T) {
+	a := computeETag([]byte("one"))
+	b := computeETag([]byte("one"))
+	d := computeETag([]byte("two"))
+	if a != b {
+		t.Errorf("ETag not deterministic: %q != %q", a, b)
+	}
+	if a == d {
+		t.Error("ETag should differ for different bodies")
+	}
+	// RFC 7232 entity-tags are quoted.
+	if len(a) < 2 || a[0] != '"' || a[len(a)-1] != '"' {
+		t.Errorf("ETag should be quoted: %q", a)
 	}
 }

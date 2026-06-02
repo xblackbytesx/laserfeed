@@ -21,7 +21,8 @@ const feedCols = `feeds.id, feeds.name, feeds.url, feeds.enabled, feeds.poll_int
 	feeds.scrape_full_content, feeds.scrape_method, feeds.scrape_selector, feeds.scrape_selector_type, feeds.scrape_max_age_days, feeds.scrape_cookies,
 	feeds.scrape_strip_selectors, feeds.scrape_page_strip_selectors,
 	feeds.retention_max_items, feeds.retention_max_hours,
-	feeds.image_mode, feeds.placeholder_image_url, feeds.last_polled_at, feeds.last_error, feeds.created_at, feeds.updated_at`
+	feeds.image_mode, feeds.placeholder_image_url, feeds.last_polled_at, feeds.last_error,
+	feeds.poll_etag, feeds.poll_last_modified, feeds.created_at, feeds.updated_at`
 
 func scanFeed(row interface{ Scan(...any) error }) (*feed.Feed, error) {
 	f := &feed.Feed{}
@@ -34,6 +35,7 @@ func scanFeed(row interface{ Scan(...any) error }) (*feed.Feed, error) {
 		&scrapeStripSelectors, &scrapePageStripSelectors,
 		&f.RetentionMaxItems, &f.RetentionMaxHours,
 		&imageModeStr, &placeholderImageURL, &lastPolledAt, &lastError,
+		&f.PollETag, &f.PollLastModified,
 		&f.CreatedAt, &f.UpdatedAt,
 	)
 	if err != nil {
@@ -169,6 +171,17 @@ func (s *FeedStore) Delete(ctx context.Context, id string) error {
 	_, err := s.db.Exec(ctx, `DELETE FROM feeds WHERE id=$1`, id)
 	if err != nil {
 		return fmt.Errorf("delete feed: %w", err)
+	}
+	return nil
+}
+
+func (s *FeedStore) UpdatePollValidators(ctx context.Context, id, etag, lastModified string) error {
+	_, err := s.db.Exec(ctx,
+		`UPDATE feeds SET poll_etag=$1, poll_last_modified=$2 WHERE id=$3`,
+		etag, lastModified, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update poll validators: %w", err)
 	}
 	return nil
 }

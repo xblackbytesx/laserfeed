@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v5"
 	"github.com/laserfeed/laserfeed/internal/domain/article"
@@ -14,6 +16,13 @@ import (
 	"github.com/laserfeed/laserfeed/internal/domain/filterrule"
 	"github.com/laserfeed/laserfeed/internal/poller"
 	"github.com/laserfeed/laserfeed/web/templates/pages"
+)
+
+const (
+	// feedDiscoveryTimeout bounds the one-off network call made when adding a
+	// feed, so a slow site can't hang the Add Feed request.
+	feedDiscoveryTimeout = 10 * time.Second
+	discoveryUserAgent   = "LaserFeed (+feed discovery)"
 )
 
 type FeedHandler struct {
@@ -28,12 +37,32 @@ func NewFeedHandler(feeds feed.Repository, articles article.Repository, rules fi
 }
 
 func (h *FeedHandler) List(c *echo.Context) error {
-	feeds, err := h.feeds.List(c.Request().Context())
+	ctx := c.Request().Context()
+	feeds, err := h.feeds.List(ctx)
 	if err != nil {
 		slog.Error("list feeds", "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load feeds")
 	}
-	return pages.FeedList(csrfToken(c), feeds).Render(c.Request().Context(), c.Response())
+
+	errorCount := 0
+	for _, f := range feeds {
+		if f.LastError != nil && *f.LastError != "" {
+			errorCount++
+		}
+	}
+
+	onlyErrors := c.QueryParam("filter") == "errors"
+	if onlyErrors {
+		filtered := make([]*feed.Feed, 0, errorCount)
+		for _, f := range feeds {
+			if f.LastError != nil && *f.LastError != "" {
+				filtered = append(filtered, f)
+			}
+		}
+		feeds = filtered
+	}
+
+	return pages.FeedList(csrfToken(c), feeds, errorCount, onlyErrors).Render(ctx, c.Response())
 }
 
 func (h *FeedHandler) Create(c *echo.Context) error {
@@ -45,6 +74,22 @@ func (h *FeedHandler) Create(c *echo.Context) error {
 	}
 
 	name := strings.TrimSpace(c.FormValue("name"))
+
+	// Auto-discovery: if the URL is an HTML page advertising feeds, switch to the
+	// first advertised feed and adopt its title when no name was given. A real
+	// feed URL has no <link rel="alternate">, so it passes through unchanged.
+	// Best-effort and time-bounded — a failure just keeps the entered URL.
+	dctx, dcancel := context.WithTimeout(ctx, feedDiscoveryTimeout)
+	if found, derr := h.poller.DiscoverFeeds(dctx, feedURL, discoveryUserAgent); derr == nil && len(found) > 0 {
+		if validateFeedURL(found[0].URL) == nil {
+			feedURL = found[0].URL
+			if name == "" {
+				name = strings.TrimSpace(found[0].Title)
+			}
+		}
+	}
+	dcancel()
+
 	if name == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "name is required")
 	}

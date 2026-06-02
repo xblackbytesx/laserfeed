@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -20,8 +23,10 @@ import (
 const atomCacheTTL = 60 * time.Second
 
 type atomCacheEntry struct {
-	body    []byte
-	expires time.Time
+	body        []byte
+	etag        string
+	generatedAt time.Time
+	expires     time.Time
 }
 
 // atomCache is a small in-memory TTL cache of rendered Atom output, keyed by
@@ -37,20 +42,34 @@ func newAtomCache() *atomCache {
 	return &atomCache{entries: make(map[string]atomCacheEntry)}
 }
 
-func (c *atomCache) get(key string) ([]byte, bool) {
+func (c *atomCache) get(key string) (atomCacheEntry, bool) {
 	c.mu.RLock()
 	e, ok := c.entries[key]
 	c.mu.RUnlock()
 	if !ok || time.Now().After(e.expires) {
-		return nil, false
+		return atomCacheEntry{}, false
 	}
-	return e.body, true
+	return e, true
 }
 
-func (c *atomCache) set(key string, body []byte) {
+// set stores body under key with a freshly computed ETag and returns the entry.
+func (c *atomCache) set(key string, body []byte) atomCacheEntry {
+	now := time.Now()
+	e := atomCacheEntry{
+		body:        body,
+		etag:        computeETag(body),
+		generatedAt: now,
+		expires:     now.Add(atomCacheTTL),
+	}
 	c.mu.Lock()
-	c.entries[key] = atomCacheEntry{body: body, expires: time.Now().Add(atomCacheTTL)}
+	c.entries[key] = e
 	c.mu.Unlock()
+	return e
+}
+
+func computeETag(body []byte) string {
+	sum := sha256.Sum256(body)
+	return `"` + hex.EncodeToString(sum[:16]) + `"`
 }
 
 const allFeedCacheKey = "\x00all"
@@ -73,12 +92,25 @@ func NewFeedOutHandler(channels channel.Repository, articles article.Repository,
 	}
 }
 
+// writeFeed emits the feed with cache-validator headers, returning 304 when the
+// client's If-None-Match already matches the current ETag.
+func (h *FeedOutHandler) writeFeed(c *echo.Context, e atomCacheEntry) error {
+	hdr := c.Response().Header()
+	hdr.Set("ETag", e.etag)
+	hdr.Set("Last-Modified", e.generatedAt.UTC().Format(http.TimeFormat))
+	hdr.Set("Cache-Control", fmt.Sprintf("public, max-age=%d", int(atomCacheTTL.Seconds())))
+	if match := c.Request().Header.Get("If-None-Match"); match != "" && match == e.etag {
+		return c.NoContent(http.StatusNotModified)
+	}
+	return c.Blob(http.StatusOK, "application/atom+xml; charset=utf-8", e.body)
+}
+
 func (h *FeedOutHandler) ChannelFeed(c *echo.Context) error {
 	ctx := c.Request().Context()
 	slug := c.Param("slug")
 
-	if cached, ok := h.cache.get(slug); ok {
-		return c.Blob(http.StatusOK, "application/atom+xml; charset=utf-8", cached)
+	if e, ok := h.cache.get(slug); ok {
+		return h.writeFeed(c, e)
 	}
 
 	ch, err := h.channels.GetBySlug(ctx, slug)
@@ -111,15 +143,14 @@ func (h *FeedOutHandler) ChannelFeed(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to generate feed")
 	}
 
-	h.cache.set(slug, atomBytes)
-	return c.Blob(http.StatusOK, "application/atom+xml; charset=utf-8", atomBytes)
+	return h.writeFeed(c, h.cache.set(slug, atomBytes))
 }
 
 func (h *FeedOutHandler) AllFeed(c *echo.Context) error {
 	ctx := c.Request().Context()
 
-	if cached, ok := h.cache.get(allFeedCacheKey); ok {
-		return c.Blob(http.StatusOK, "application/atom+xml; charset=utf-8", cached)
+	if e, ok := h.cache.get(allFeedCacheKey); ok {
+		return h.writeFeed(c, e)
 	}
 
 	arts, err := h.articles.ListRecent(ctx, 100, 0)
@@ -159,6 +190,5 @@ func (h *FeedOutHandler) AllFeed(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to generate feed")
 	}
 
-	h.cache.set(allFeedCacheKey, atomBytes)
-	return c.Blob(http.StatusOK, "application/atom+xml; charset=utf-8", atomBytes)
+	return h.writeFeed(c, h.cache.set(allFeedCacheKey, atomBytes))
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +12,11 @@ import (
 	"github.com/laserfeed/laserfeed/internal/domain/feed"
 	"github.com/laserfeed/laserfeed/internal/scraper"
 )
+
+// maxStartupJitter caps the random delay before a feed's first poll, so a mass
+// start (e.g. after a restart) spreads outbound fetches instead of firing them
+// all simultaneously.
+const maxStartupJitter = 30 * time.Second
 
 type feedPollState struct {
 	cancel    context.CancelFunc
@@ -225,7 +231,26 @@ func (m *Manager) ReScrapeArticles(feedID string) {
 	}()
 }
 
+// DiscoverFeeds resolves feed links advertised by an HTML page, reusing the
+// manager's hardened (SSRF-safe) scraper client.
+func (m *Manager) DiscoverFeeds(ctx context.Context, pageURL, userAgent string) ([]scraper.DiscoveredFeed, error) {
+	return m.scraper.DiscoverFeeds(ctx, pageURL, userAgent)
+}
+
 func (m *Manager) runFeedLoop(ctx context.Context, feedID string, refreshCh chan struct{}) {
+	// Stagger the first poll by a small random delay so a mass start doesn't
+	// fire every feed at once. A manual add still polls promptly because Create
+	// signals refreshCh right after StartFeed, which cancels this wait.
+	jitter := time.NewTimer(rand.N(maxStartupJitter))
+	select {
+	case <-ctx.Done():
+		jitter.Stop()
+		return
+	case <-jitter.C:
+	case <-refreshCh:
+		jitter.Stop()
+	}
+
 	pollOnce(ctx, feedID, m.stores, m.scraper)
 
 	for {

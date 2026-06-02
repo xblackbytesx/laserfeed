@@ -91,6 +91,8 @@ type Feed struct {
 	PlaceholderImageURL      *string
 	LastPolledAt             *time.Time
 	LastError                *string
+	PollETag                 string // HTTP ETag from the last successful poll (conditional GET)
+	PollLastModified         string // HTTP Last-Modified from the last successful poll
 	CreatedAt                time.Time
 	UpdatedAt                time.Time
 }
@@ -104,4 +106,6 @@ type Repository interface {
 	Update(ctx context.Context, f *Feed) (*Feed, error)
 	Delete(ctx context.Context, id string) error
 	UpdatePollStatus(ctx context.Context, id string, lastPolledAt time.Time, lastError *string) error
+	// UpdatePollValidators stores the HTTP cache validators from a successful poll.
+	UpdatePollValidators(ctx context.Context, id, etag, lastModified string) error
 }

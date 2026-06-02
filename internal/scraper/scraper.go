@@ -71,6 +71,12 @@ const maxBodySize = 5 * 1024 * 1024 // 5MB
 // abuse rather than SSRF (which the dialer already prevents).
 const maxRedirects = 5
 
+// maxConcurrentFeedFetches bounds how many feed/page fetches run at once across
+// all poll goroutines. It prevents a thundering herd (e.g. every feed's timer
+// firing at once after a restart) from opening hundreds of simultaneous
+// connections. Per-feed article scraping has its own separate cap.
+const maxConcurrentFeedFetches = 8
+
 // perScrapeTimeout is applied to each individual article fetch independently
 // of any outer poll timeout, so one slow page doesn't starve the rest.
 const perScrapeTimeout = 15 * time.Second
@@ -99,7 +105,8 @@ func SanitizeHTML(html string) string {
 }
 
 type Scraper struct {
-	client *http.Client
+	client   *http.Client
+	fetchSem chan struct{} // bounds concurrent feed/page fetches
 }
 
 func New() *Scraper {
@@ -128,15 +135,50 @@ func New() *Scraper {
 				return nil
 			},
 		},
+		fetchSem: make(chan struct{}, maxConcurrentFeedFetches),
 	}
 }
 
-func (s *Scraper) FetchFeed(ctx context.Context, url, userAgent string) (*gofeed.Feed, error) {
+// acquireFetch blocks until a global fetch slot is free or ctx is cancelled.
+// The returned release func must be called when the fetch completes.
+func (s *Scraper) acquireFetch(ctx context.Context) (release func(), err error) {
+	select {
+	case s.fetchSem <- struct{}{}:
+		return func() { <-s.fetchSem }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// FeedResult is the outcome of a (possibly conditional) feed fetch.
+type FeedResult struct {
+	Feed         *gofeed.Feed // nil when NotModified
+	NotModified  bool         // server returned 304
+	ETag         string       // ETag to store for the next conditional request
+	LastModified string       // Last-Modified to store for the next conditional request
+}
+
+// FetchFeed retrieves and parses a feed. When prevETag/prevLastModified are
+// non-empty they are sent as If-None-Match/If-Modified-Since; a 304 response
+// yields NotModified (and a nil Feed) so the caller can skip re-parsing.
+func (s *Scraper) FetchFeed(ctx context.Context, url, userAgent, prevETag, prevLastModified string) (*FeedResult, error) {
+	release, err := s.acquireFetch(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("User-Agent", userAgent)
+	if prevETag != "" {
+		req.Header.Set("If-None-Match", prevETag)
+	}
+	if prevLastModified != "" {
+		req.Header.Set("If-Modified-Since", prevLastModified)
+	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -144,6 +186,10 @@ func (s *Scraper) FetchFeed(ctx context.Context, url, userAgent string) (*gofeed
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotModified {
+		// Carry the previous validators forward; the server confirmed they're current.
+		return &FeedResult{NotModified: true, ETag: prevETag, LastModified: prevLastModified}, nil
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("feed server returned %s", resp.Status)
 	}
@@ -158,7 +204,85 @@ func (s *Scraper) FetchFeed(ctx context.Context, url, userAgent string) (*gofeed
 	if err != nil {
 		return nil, fmt.Errorf("parse feed: %w", err)
 	}
-	return feed, nil
+	return &FeedResult{
+		Feed:         feed,
+		ETag:         resp.Header.Get("ETag"),
+		LastModified: resp.Header.Get("Last-Modified"),
+	}, nil
+}
+
+// DiscoveredFeed is a feed link advertised by an HTML page.
+type DiscoveredFeed struct {
+	URL   string
+	Title string
+}
+
+// DiscoverFeeds fetches an HTML page and returns any RSS/Atom/JSON feeds it
+// advertises via <link rel="alternate" type="application/(rss|atom|feed)+...">.
+// Relative hrefs are resolved against pageURL. Uses the same hardened client.
+func (s *Scraper) DiscoverFeeds(ctx context.Context, pageURL, userAgent string) ([]DiscoveredFeed, error) {
+	release, err := s.acquireFetch(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("User-Agent", userAgent)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch page: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("page returned HTTP %s", resp.Status)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodySize))
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+	return discoverFeedsInHTML(string(body), pageURL)
+}
+
+// discoverFeedsInHTML is the pure parsing half of DiscoverFeeds (unit-testable).
+func discoverFeedsInHTML(htmlBody, pageURL string) ([]DiscoveredFeed, error) {
+	base, err := url.Parse(pageURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse page url: %w", err)
+	}
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlBody))
+	if err != nil {
+		return nil, fmt.Errorf("parse html: %w", err)
+	}
+	var feeds []DiscoveredFeed
+	seen := map[string]bool{}
+	doc.Find(`link[rel~="alternate"]`).Each(func(_ int, sel *goquery.Selection) {
+		switch typ, _ := sel.Attr("type"); typ {
+		case "application/rss+xml", "application/atom+xml", "application/feed+json":
+		default:
+			return
+		}
+		href, ok := sel.Attr("href")
+		if !ok || strings.TrimSpace(href) == "" {
+			return
+		}
+		ref, err := url.Parse(strings.TrimSpace(href))
+		if err != nil {
+			return
+		}
+		abs := base.ResolveReference(ref).String()
+		if seen[abs] {
+			return
+		}
+		seen[abs] = true
+		title, _ := sel.Attr("title")
+		feeds = append(feeds, DiscoveredFeed{URL: abs, Title: strings.TrimSpace(title)})
+	})
+	return feeds, nil
 }
 
 // ScrapeContent fetches articleURL and extracts reader-view HTML. Each call has its
