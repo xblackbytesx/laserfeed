@@ -21,7 +21,7 @@ RUN go mod download
 # Copy source.
 COPY . .
 
-RUN go install github.com/a-h/templ/cmd/templ@v0.3.1001 && \
+RUN go install github.com/a-h/templ/cmd/templ@v0.3.1020 && \
     templ generate
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o laserfeed ./cmd/laserfeed

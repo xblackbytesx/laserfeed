@@ -57,13 +57,7 @@ func (h *FeedHandler) Create(c *echo.Context) error {
 		pollInterval = 3600
 	}
 
-	imageMode := feed.ImageMode(c.FormValue("image_mode"))
-	switch imageMode {
-	case feed.ImageModeNone, feed.ImageModePlaceholder, feed.ImageModeRandom, feed.ImageModeBuiltin:
-		// valid
-	default:
-		imageMode = feed.ImageModeRandom
-	}
+	imageMode := feed.NormalizeImageMode(c.FormValue("image_mode"))
 
 	f := &feed.Feed{
 		Name:                name,
@@ -152,21 +146,9 @@ func (h *FeedHandler) Update(c *echo.Context) error {
 	f.ScrapeMaxAgeDays = scrapeMaxAge
 	f.RetentionMaxItems = retentionMaxItems
 	f.RetentionMaxHours = retentionMaxHours
-	editImageMode := feed.ImageMode(c.FormValue("image_mode"))
-	if editImageMode == "extract" {
-		editImageMode = feed.ImageModeNone
-	}
-	f.ImageMode = editImageMode
-	scrapeMethod := feed.ScrapeMethod(c.FormValue("scrape_method"))
-	if scrapeMethod != feed.ScrapeMethodReadability && scrapeMethod != feed.ScrapeMethodSelector {
-		scrapeMethod = feed.ScrapeMethodReadability
-	}
-	f.ScrapeMethod = scrapeMethod
-	selectorType := feed.SelectorType(c.FormValue("scrape_selector_type"))
-	if selectorType != feed.SelectorTypeCSS && selectorType != feed.SelectorTypeXPath {
-		selectorType = feed.SelectorTypeCSS
-	}
-	f.ScrapeSelectorType = selectorType
+	f.ImageMode = feed.NormalizeImageMode(c.FormValue("image_mode"))
+	f.ScrapeMethod = feed.NormalizeScrapeMethod(c.FormValue("scrape_method"))
+	f.ScrapeSelectorType = feed.NormalizeSelectorType(c.FormValue("scrape_selector_type"))
 
 	var perr error
 	if f.UserAgent, perr = optionalStr(c, "user_agent", 500); perr != nil {

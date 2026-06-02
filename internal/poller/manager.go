@@ -49,10 +49,26 @@ func (m *Manager) Wait() {
 }
 
 func (m *Manager) Start() {
-	feeds, err := m.stores.Feeds.ListEnabled(m.rootCtx)
-	if err != nil {
-		slog.Error("poller manager: list enabled feeds", "err", err)
-		return
+	// Retry the initial load with capped backoff so a transient DB hiccup at
+	// startup doesn't permanently leave the poller idle (it would otherwise
+	// require a process restart). Aborts cleanly if the root context is cancelled.
+	var feeds []*feed.Feed
+	backoff := time.Second
+	for {
+		var err error
+		feeds, err = m.stores.Feeds.ListEnabled(m.rootCtx)
+		if err == nil {
+			break
+		}
+		slog.Error("poller manager: list enabled feeds", "err", err, "retry_in", backoff)
+		select {
+		case <-m.rootCtx.Done():
+			return
+		case <-time.After(backoff):
+		}
+		if backoff < 30*time.Second {
+			backoff *= 2
+		}
 	}
 	for _, f := range feeds {
 		m.StartFeed(f)

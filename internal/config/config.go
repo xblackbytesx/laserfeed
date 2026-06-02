@@ -7,6 +7,10 @@ import (
 	"strconv"
 )
 
+// placeholderCSRFKey is the example value shipped in .env.example. Refusing it
+// stops an instance from launching with a publicly-known signing key.
+const placeholderCSRFKey = "change-me-to-a-random-32-char-secret"
+
 type Config struct {
 	DatabaseURL   string
 	CSRFAuthKey   string
@@ -43,6 +47,9 @@ func Load() (*Config, error) {
 	}
 	if len(cfg.CSRFAuthKey) < 32 {
 		return nil, fmt.Errorf("CSRF_AUTH_KEY must be at least 32 characters")
+	}
+	if cfg.CSRFAuthKey == placeholderCSRFKey {
+		return nil, fmt.Errorf("CSRF_AUTH_KEY is still the example placeholder; generate a real one (e.g. `openssl rand -base64 32`)")
 	}
 	if cfg.AppBaseURL == "" {
 		cfg.AppBaseURL = "http://localhost:8080"

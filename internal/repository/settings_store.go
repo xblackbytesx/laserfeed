@@ -29,7 +29,7 @@ func (s *SettingsStore) Get(ctx context.Context) (*settings.Settings, error) {
 	for rows.Next() {
 		var k, v string
 		if err := rows.Scan(&k, &v); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan setting: %w", err)
 		}
 		m[k] = v
 	}

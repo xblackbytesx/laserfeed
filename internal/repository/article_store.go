@@ -83,7 +83,7 @@ func (s *ArticleStore) GetScrapedGUIDs(ctx context.Context, feedID string) (map[
 	for rows.Next() {
 		var guid string
 		if err := rows.Scan(&guid); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan guid: %w", err)
 		}
 		guids[guid] = true
 	}
@@ -136,7 +136,7 @@ func (s *ArticleStore) GetScrapeStats(ctx context.Context, feedID string) (*arti
 		var status string
 		var count int
 		if err := rows.Scan(&status, &count); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan scrape stats: %w", err)
 		}
 		switch article.ScrapeStatus(status) {
 		case article.ScrapeStatusSuccess:
@@ -163,7 +163,7 @@ func (s *ArticleStore) ListForReScrape(ctx context.Context, feedID string) ([]*a
 	for rows.Next() {
 		ref := &article.ArticleRef{}
 		if err := rows.Scan(&ref.ID, &ref.URL); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan article ref: %w", err)
 		}
 		refs = append(refs, ref)
 	}
@@ -210,11 +210,11 @@ func (s *ArticleStore) ListByFeedID(ctx context.Context, feedID string, includeF
 		return nil, fmt.Errorf("list articles by feed: %w", err)
 	}
 	defer rows.Close()
-	var articles []*article.Article
+	articles := make([]*article.Article, 0, limit)
 	for rows.Next() {
 		a, err := scanArticle(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan article: %w", err)
 		}
 		articles = append(articles, a)
 	}
@@ -235,11 +235,11 @@ func (s *ArticleStore) ListByFeedIDs(ctx context.Context, feedIDs []string, limi
 		return nil, fmt.Errorf("list articles by feed ids: %w", err)
 	}
 	defer rows.Close()
-	var articles []*article.Article
+	articles := make([]*article.Article, 0, limit)
 	for rows.Next() {
 		a, err := scanArticle(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan article: %w", err)
 		}
 		articles = append(articles, a)
 	}
@@ -257,11 +257,11 @@ func (s *ArticleStore) ListRecent(ctx context.Context, limit, offset int) ([]*ar
 		return nil, fmt.Errorf("list recent articles: %w", err)
 	}
 	defer rows.Close()
-	var articles []*article.Article
+	articles := make([]*article.Article, 0, limit)
 	for rows.Next() {
 		a, err := scanArticle(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan article: %w", err)
 		}
 		articles = append(articles, a)
 	}

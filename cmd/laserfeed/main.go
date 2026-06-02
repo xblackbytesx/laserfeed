@@ -22,6 +22,15 @@ import (
 	"github.com/laserfeed/laserfeed/internal/repository"
 )
 
+// HTTP server timeouts. Generous enough for SSR rendering and large
+// import/export bodies, tight enough to shed stuck connections.
+const (
+	readHeaderTimeout = 10 * time.Second
+	readTimeout       = 30 * time.Second
+	writeTimeout      = 60 * time.Second
+	idleTimeout       = 120 * time.Second
+)
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -81,7 +90,7 @@ func main() {
 			h.Set("X-Content-Type-Options", "nosniff")
 			h.Set("X-Frame-Options", "DENY")
 			h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-			h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src * data:; font-src 'self' data:")
+			h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' data:")
 			if cfg.SecureCookies {
 				h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
 			}
@@ -162,10 +171,10 @@ func main() {
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           e,
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
 	}
 
 	sig := make(chan os.Signal, 1)

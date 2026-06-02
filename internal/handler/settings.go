@@ -58,10 +58,7 @@ func (h *SettingsHandler) Post(c *echo.Context) error {
 	}
 
 	imageMode := c.FormValue("image_mode")
-	switch imageMode {
-	case "none", "placeholder", "random", "builtin":
-		// valid
-	default:
+	if !feed.ImageMode(imageMode).Valid() {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid image mode")
 	}
 

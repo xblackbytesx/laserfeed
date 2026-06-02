@@ -94,7 +94,7 @@ func (s *FeedStore) List(ctx context.Context) ([]*feed.Feed, error) {
 	for rows.Next() {
 		f, err := scanFeed(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan feed: %w", err)
 		}
 		feeds = append(feeds, f)
 	}
@@ -111,7 +111,30 @@ func (s *FeedStore) ListEnabled(ctx context.Context) ([]*feed.Feed, error) {
 	for rows.Next() {
 		f, err := scanFeed(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan feed: %w", err)
+		}
+		feeds = append(feeds, f)
+	}
+	return feeds, rows.Err()
+}
+
+// ListByIDs returns the feeds matching the given IDs (in arbitrary order).
+// Used to fetch only the feeds referenced by a result set rather than loading
+// every feed into memory.
+func (s *FeedStore) ListByIDs(ctx context.Context, ids []string) ([]*feed.Feed, error) {
+	if len(ids) == 0 {
+		return []*feed.Feed{}, nil
+	}
+	rows, err := s.db.Query(ctx, `SELECT `+feedCols+` FROM feeds WHERE feeds.id = ANY($1)`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("list feeds by ids: %w", err)
+	}
+	defer rows.Close()
+	feeds := make([]*feed.Feed, 0, len(ids))
+	for rows.Next() {
+		f, err := scanFeed(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan feed: %w", err)
 		}
 		feeds = append(feeds, f)
 	}

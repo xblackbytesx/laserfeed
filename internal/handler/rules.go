@@ -43,16 +43,12 @@ func (h *RulesHandler) Create(c *echo.Context) error {
 	feedID := c.Param("id")
 
 	ruleType := filterrule.RuleType(c.FormValue("rule_type"))
-	if ruleType != filterrule.RuleTypeWhitelist && ruleType != filterrule.RuleTypeBlacklist {
+	if !ruleType.Valid() {
 		return echo.NewHTTPError(http.StatusBadRequest, "rule_type must be 'whitelist' or 'blacklist'")
 	}
 
 	matchField := filterrule.MatchField(c.FormValue("match_field"))
-	switch matchField {
-	case filterrule.MatchFieldTitle, filterrule.MatchFieldURL,
-		filterrule.MatchFieldContent, filterrule.MatchFieldDescription:
-		// valid
-	default:
+	if !matchField.Valid() {
 		return echo.NewHTTPError(http.StatusBadRequest, "match_field must be one of: title, url, content, description")
 	}
 

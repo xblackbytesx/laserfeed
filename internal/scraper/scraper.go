@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
+	readability "codeberg.org/readeck/go-readability/v2"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/antchfx/htmlquery"
-	readability "codeberg.org/readeck/go-readability/v2"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/mmcdole/gofeed"
 )
@@ -66,6 +66,11 @@ func safeDialContext(d *net.Dialer) func(ctx context.Context, network, addr stri
 
 const maxBodySize = 5 * 1024 * 1024 // 5MB
 
+// maxRedirects caps how many redirects a single fetch will follow. Each hop is
+// still re-checked by safeDialContext, so this mainly bounds redirect-chain
+// abuse rather than SSRF (which the dialer already prevents).
+const maxRedirects = 5
+
 // perScrapeTimeout is applied to each individual article fetch independently
 // of any outer poll timeout, so one slow page doesn't starve the rest.
 const perScrapeTimeout = 15 * time.Second
@@ -116,6 +121,12 @@ func New() *Scraper {
 		client: &http.Client{
 			Timeout:   30 * time.Second,
 			Transport: transport,
+			CheckRedirect: func(_ *http.Request, via []*http.Request) error {
+				if len(via) >= maxRedirects {
+					return fmt.Errorf("stopped after %d redirects", maxRedirects)
+				}
+				return nil
+			},
 		},
 	}
 }

@@ -77,16 +77,30 @@ func (h *SettingsHandler) ExportOPML(c *echo.Context) error {
 	}
 	channelEntries := make([]channelEntry, 0, len(channels))
 
+	channelIDs := make([]string, len(channels))
+	for i, ch := range channels {
+		channelIDs[i] = ch.ID
+	}
+	refs, err := h.channels.ListFeedRefs(ctx, channelIDs)
+	if err != nil {
+		slog.Error("opml export: list channel feeds", "err", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channel feeds")
+	}
+	refsByChannel := make(map[string][]channel.FeedRef, len(channels))
+	for _, ref := range refs {
+		inChannel[ref.URL] = true
+		refsByChannel[ref.ChannelID] = append(refsByChannel[ref.ChannelID], ref)
+	}
+
 	for _, ch := range channels {
-		chFeeds, err := h.channels.ListFeeds(ctx, ch.ID)
-		if err != nil {
-			slog.Error("opml export: list channel feeds", "channel_id", ch.ID, "err", err)
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channel feeds")
-		}
 		var outlines []opmlOutline
-		for _, f := range chFeeds {
-			inChannel[f.URL] = true
-			outlines = append(outlines, feedOutline(f))
+		for _, ref := range refsByChannel[ch.ID] {
+			outlines = append(outlines, opmlOutline{
+				Type:   "rss",
+				Text:   ref.Name,
+				Title:  ref.Name,
+				XmlUrl: ref.URL,
+			})
 		}
 		channelEntries = append(channelEntries, channelEntry{ch: ch, outlines: outlines})
 	}
@@ -126,12 +140,13 @@ func (h *SettingsHandler) ExportOPML(c *echo.Context) error {
 
 	if _, err := io.WriteString(c.Response(), `<?xml version="1.0" encoding="UTF-8"?>`+"\n"); err != nil {
 		slog.Error("opml export: write xml declaration", "err", err)
-		return nil
+		return fmt.Errorf("write opml declaration: %w", err)
 	}
 	enc := xml.NewEncoder(c.Response())
 	enc.Indent("", "  ")
 	if err := enc.Encode(doc); err != nil {
 		slog.Error("opml export: encode xml", "err", err)
+		return fmt.Errorf("encode opml: %w", err)
 	}
 	return nil
 }

@@ -135,9 +135,36 @@ func (s *ChannelStore) ListFeeds(ctx context.Context, channelID string) ([]*feed
 	for rows.Next() {
 		f, err := scanFeed(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan feed: %w", err)
 		}
 		feeds = append(feeds, f)
 	}
 	return feeds, rows.Err()
+}
+
+func (s *ChannelStore) ListFeedRefs(ctx context.Context, channelIDs []string) ([]channel.FeedRef, error) {
+	if len(channelIDs) == 0 {
+		return []channel.FeedRef{}, nil
+	}
+	rows, err := s.db.Query(ctx,
+		`SELECT cf.channel_id, feeds.id, feeds.name, feeds.url
+		FROM feeds
+		JOIN channel_feeds cf ON cf.feed_id=feeds.id
+		WHERE cf.channel_id = ANY($1)
+		ORDER BY cf.channel_id, cf.added_at`,
+		channelIDs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list channel feed refs: %w", err)
+	}
+	defer rows.Close()
+	var refs []channel.FeedRef
+	for rows.Next() {
+		var r channel.FeedRef
+		if err := rows.Scan(&r.ChannelID, &r.FeedID, &r.Name, &r.URL); err != nil {
+			return nil, fmt.Errorf("scan channel feed ref: %w", err)
+		}
+		refs = append(refs, r)
+	}
+	return refs, rows.Err()
 }

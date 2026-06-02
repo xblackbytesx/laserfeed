@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/laserfeed/laserfeed/internal/domain/article"
@@ -47,8 +48,26 @@ func resolveBuiltinFile(file, guid string) string {
 		return file
 	}
 	h := fnv.New32a()
+	// hash.Hash.Write never returns an error, so the result is ignored intentionally.
 	_, _ = h.Write([]byte(guid))
 	return builtinSVGs[h.Sum32()%uint32(len(builtinSVGs))]
+}
+
+// maxConcurrentScrapes bounds how many article pages a single feed poll will
+// fetch in parallel, so a feed with many articles ingests quickly without
+// opening an unbounded number of outbound connections.
+const maxConcurrentScrapes = 4
+
+// redactURLUserinfo strips any user:password@ component from a URL before it is
+// logged. Feed URLs are validated to reject credentials on input, but this is
+// defense-in-depth so a credential can never leak into the logs.
+func redactURLUserinfo(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.User == nil {
+		return raw
+	}
+	u.User = nil
+	return u.String()
 }
 
 // scrapeParams holds the resolved scraping configuration for a single feed,
@@ -145,7 +164,7 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		if statusErr := stores.Feeds.UpdatePollStatus(ctx, feedID, now, &errStr); statusErr != nil {
 			slog.Warn("poller: persist fetch error status", "feed_id", feedID, "err", statusErr)
 		}
-		slog.Error("poller: fetch feed", "feed_id", feedID, "url", f.URL, "err", err)
+		slog.Error("poller: fetch feed", "feed_id", feedID, "url", redactURLUserinfo(f.URL), "err", err)
 		return
 	}
 
@@ -170,42 +189,78 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		}
 	}
 
-	for _, item := range parsedFeed.Items {
+	// Phase 1: decide which items need a network scrape this cycle.
+	type itemWork struct {
+		guid        string
+		needsScrape bool
+		scraped     string
+		scrapeErr   error
+	}
+	works := make([]itemWork, len(parsedFeed.Items))
+	for i, item := range parsedFeed.Items {
 		guid := item.GUID
 		if guid == "" {
 			guid = item.Link
 		}
+		works[i] = itemWork{
+			guid:        guid,
+			needsScrape: f.ScrapeFullContent && item.Link != "" && !scrapedGUIDs[guid],
+		}
+	}
+
+	// Phase 2: scrape the pages that need it in parallel, bounded by a
+	// semaphore. Each goroutine writes only to its own works[i], so no locking
+	// is needed. A single slow page no longer stalls the rest of the cycle.
+	if f.ScrapeFullContent {
+		sem := make(chan struct{}, maxConcurrentScrapes)
+		var wg sync.WaitGroup
+		for i := range works {
+			if !works[i].needsScrape {
+				continue
+			}
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(w *itemWork, link string) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				w.scraped, w.scrapeErr = sc.ScrapeContent(ctx, link, sp.userAgent, sp.method, sp.selector, sp.selectorType, sp.cookies, sp.stripSelectors, sp.pageStripSelectors)
+			}(&works[i], parsedFeed.Items[i].Link)
+		}
+		wg.Wait()
+	}
+
+	// Phase 3: build and upsert each article from its (possibly scraped) content.
+	for i, item := range parsedFeed.Items {
+		w := &works[i]
+		guid := w.guid
 
 		var content string
 		var scrapeStatus article.ScrapeStatus
 		var scrapeError string
 
-		if f.ScrapeFullContent && item.Link != "" && !scrapedGUIDs[guid] {
-			scraped, err := sc.ScrapeContent(ctx, item.Link, sp.userAgent, sp.method, sp.selector, sp.selectorType, sp.cookies, sp.stripSelectors, sp.pageStripSelectors)
-			switch {
-			case err != nil:
-				slog.Warn("poller: scrape content", "url", item.Link, "err", err)
-				scrapeStatus = article.ScrapeStatusFailed
-				scrapeError = err.Error()
-				content = scraper.SanitizeHTML(item.Content)
-			case strings.TrimSpace(scraped) == "":
-				if sp.method == "selector" {
-					scrapeError = fmt.Sprintf("selector %q matched no content", sp.selector)
-				} else {
-					scrapeError = "readability could not extract content from the page"
-				}
-				slog.Warn("poller: scrape empty", "url", item.Link, "reason", scrapeError)
-				scrapeStatus = article.ScrapeStatusFailed
-				content = scraper.SanitizeHTML(item.Content)
-			default:
-				scrapeStatus = article.ScrapeStatusSuccess
-				content = scraped
+		switch {
+		case w.needsScrape && w.scrapeErr != nil:
+			slog.Warn("poller: scrape content", "url", item.Link, "err", w.scrapeErr)
+			scrapeStatus = article.ScrapeStatusFailed
+			scrapeError = w.scrapeErr.Error()
+			content = scraper.SanitizeHTML(item.Content)
+		case w.needsScrape && strings.TrimSpace(w.scraped) == "":
+			if sp.method == "selector" {
+				scrapeError = fmt.Sprintf("selector %q matched no content", sp.selector)
+			} else {
+				scrapeError = "readability could not extract content from the page"
 			}
-		} else if scrapedGUIDs[guid] {
+			slog.Warn("poller: scrape empty", "url", item.Link, "reason", scrapeError)
+			scrapeStatus = article.ScrapeStatusFailed
+			content = scraper.SanitizeHTML(item.Content)
+		case w.needsScrape:
+			scrapeStatus = article.ScrapeStatusSuccess
+			content = w.scraped
+		case scrapedGUIDs[guid]:
 			// Already scraped — upsert preserves the stored content.
 			scrapeStatus = article.ScrapeStatusSuccess
 			content = scraper.SanitizeHTML(item.Content)
-		} else {
+		default:
 			scrapeStatus = article.ScrapeStatusNone
 			content = scraper.SanitizeHTML(item.Content)
 		}

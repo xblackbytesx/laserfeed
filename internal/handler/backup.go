@@ -22,22 +22,22 @@ type backupDoc struct {
 }
 
 type backupFeed struct {
-	Name                string       `json:"name"`
-	URL                 string       `json:"url"`
-	Enabled             bool         `json:"enabled"`
-	PollIntervalSeconds int          `json:"poll_interval_seconds"`
-	UserAgent           *string      `json:"user_agent,omitempty"`
-	ScrapeFullContent   bool         `json:"scrape_full_content"`
-	ScrapeMethod        string       `json:"scrape_method"`
-	ScrapeSelector      *string      `json:"scrape_selector,omitempty"`
-	ScrapeSelectorType  string       `json:"scrape_selector_type"`
-	ScrapeMaxAgeDays    int          `json:"scrape_max_age_days"`
-	ScrapeCookies           *string      `json:"scrape_cookies,omitempty"`
+	Name                     string       `json:"name"`
+	URL                      string       `json:"url"`
+	Enabled                  bool         `json:"enabled"`
+	PollIntervalSeconds      int          `json:"poll_interval_seconds"`
+	UserAgent                *string      `json:"user_agent,omitempty"`
+	ScrapeFullContent        bool         `json:"scrape_full_content"`
+	ScrapeMethod             string       `json:"scrape_method"`
+	ScrapeSelector           *string      `json:"scrape_selector,omitempty"`
+	ScrapeSelectorType       string       `json:"scrape_selector_type"`
+	ScrapeMaxAgeDays         int          `json:"scrape_max_age_days"`
+	ScrapeCookies            *string      `json:"scrape_cookies,omitempty"`
 	ScrapeStripSelectors     *string      `json:"scrape_strip_selectors,omitempty"`
 	ScrapePageStripSelectors *string      `json:"scrape_page_strip_selectors,omitempty"`
-	ImageMode               string       `json:"image_mode"`
-	PlaceholderImageURL *string      `json:"placeholder_image_url,omitempty"`
-	FilterRules         []backupRule `json:"filter_rules,omitempty"`
+	ImageMode                string       `json:"image_mode"`
+	PlaceholderImageURL      *string      `json:"placeholder_image_url,omitempty"`
+	FilterRules              []backupRule `json:"filter_rules,omitempty"`
 }
 
 type backupRule struct {
@@ -76,31 +76,39 @@ func (h *SettingsHandler) Export(c *echo.Context) error {
 		ExportedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 
-	for _, f := range feeds {
-		rules, err := h.filterRules.ListByFeedID(ctx, f.ID)
-		if err != nil {
-			slog.Error("export: list rules", "feed_id", f.ID, "err", err)
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load filter rules")
-		}
+	feedIDs := make([]string, len(feeds))
+	for i, f := range feeds {
+		feedIDs[i] = f.ID
+	}
+	allRules, err := h.filterRules.ListByFeedIDs(ctx, feedIDs)
+	if err != nil {
+		slog.Error("export: list rules", "err", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load filter rules")
+	}
+	rulesByFeed := make(map[string][]*filterrule.FilterRule, len(feeds))
+	for _, r := range allRules {
+		rulesByFeed[r.FeedID] = append(rulesByFeed[r.FeedID], r)
+	}
 
+	for _, f := range feeds {
 		bf := backupFeed{
-			Name:                 f.Name,
-			URL:                  f.URL,
-			Enabled:              f.Enabled,
-			PollIntervalSeconds:  f.PollIntervalSeconds,
-			UserAgent:            f.UserAgent,
-			ScrapeFullContent:    f.ScrapeFullContent,
-			ScrapeMethod:         string(f.ScrapeMethod),
-			ScrapeSelector:       f.ScrapeSelector,
-			ScrapeSelectorType:   string(f.ScrapeSelectorType),
-			ScrapeMaxAgeDays:     f.ScrapeMaxAgeDays,
-			ScrapeCookies:        f.ScrapeCookies,
+			Name:                     f.Name,
+			URL:                      f.URL,
+			Enabled:                  f.Enabled,
+			PollIntervalSeconds:      f.PollIntervalSeconds,
+			UserAgent:                f.UserAgent,
+			ScrapeFullContent:        f.ScrapeFullContent,
+			ScrapeMethod:             string(f.ScrapeMethod),
+			ScrapeSelector:           f.ScrapeSelector,
+			ScrapeSelectorType:       string(f.ScrapeSelectorType),
+			ScrapeMaxAgeDays:         f.ScrapeMaxAgeDays,
+			ScrapeCookies:            f.ScrapeCookies,
 			ScrapeStripSelectors:     f.ScrapeStripSelectors,
 			ScrapePageStripSelectors: f.ScrapePageStripSelectors,
 			ImageMode:                string(f.ImageMode),
-			PlaceholderImageURL:  f.PlaceholderImageURL,
+			PlaceholderImageURL:      f.PlaceholderImageURL,
 		}
-		for _, r := range rules {
+		for _, r := range rulesByFeed[f.ID] {
 			bf.FilterRules = append(bf.FilterRules, backupRule{
 				RuleType:     string(r.RuleType),
 				MatchField:   string(r.MatchField),
@@ -110,22 +118,27 @@ func (h *SettingsHandler) Export(c *echo.Context) error {
 		doc.Feeds = append(doc.Feeds, bf)
 	}
 
-	for _, ch := range channels {
-		chFeeds, err := h.channels.ListFeeds(ctx, ch.ID)
-		if err != nil {
-			slog.Error("export: list channel feeds", "channel_id", ch.ID, "err", err)
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channel feeds")
-		}
+	channelIDs := make([]string, len(channels))
+	for i, ch := range channels {
+		channelIDs[i] = ch.ID
+	}
+	channelRefs, err := h.channels.ListFeedRefs(ctx, channelIDs)
+	if err != nil {
+		slog.Error("export: list channel feeds", "err", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channel feeds")
+	}
+	urlsByChannel := make(map[string][]string, len(channels))
+	for _, ref := range channelRefs {
+		urlsByChannel[ref.ChannelID] = append(urlsByChannel[ref.ChannelID], ref.URL)
+	}
 
-		bc := backupChannel{
+	for _, ch := range channels {
+		doc.Channels = append(doc.Channels, backupChannel{
 			Name:        ch.Name,
 			Slug:        ch.Slug,
 			Description: ch.Description,
-		}
-		for _, f := range chFeeds {
-			bc.FeedURLs = append(bc.FeedURLs, f.URL)
-		}
-		doc.Channels = append(doc.Channels, bc)
+			FeedURLs:    urlsByChannel[ch.ID],
+		})
 	}
 
 	filename := fmt.Sprintf("laserfeed-backup-%s.json", time.Now().UTC().Format("2006-01-02"))
@@ -136,6 +149,7 @@ func (h *SettingsHandler) Export(c *echo.Context) error {
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(doc); err != nil {
 		slog.Error("export: encode json", "err", err)
+		return fmt.Errorf("encode backup: %w", err)
 	}
 	return nil
 }
@@ -202,18 +216,14 @@ func (h *SettingsHandler) Import(c *echo.Context) error {
 			existing.PollIntervalSeconds = bf.PollIntervalSeconds
 			existing.UserAgent = bf.UserAgent
 			existing.ScrapeFullContent = bf.ScrapeFullContent
-			scrapeMethod := feed.ScrapeMethod(bf.ScrapeMethod)
-			if scrapeMethod != feed.ScrapeMethodReadability && scrapeMethod != feed.ScrapeMethodSelector {
-				scrapeMethod = feed.ScrapeMethodReadability
-			}
-			existing.ScrapeMethod = scrapeMethod
+			existing.ScrapeMethod = feed.NormalizeScrapeMethod(bf.ScrapeMethod)
 			existing.ScrapeSelector = bf.ScrapeSelector
-			existing.ScrapeSelectorType = feed.SelectorType(bf.ScrapeSelectorType)
+			existing.ScrapeSelectorType = feed.NormalizeSelectorType(bf.ScrapeSelectorType)
 			existing.ScrapeMaxAgeDays = bf.ScrapeMaxAgeDays
 			existing.ScrapeCookies = bf.ScrapeCookies
 			existing.ScrapeStripSelectors = bf.ScrapeStripSelectors
 			existing.ScrapePageStripSelectors = bf.ScrapePageStripSelectors
-			existing.ImageMode = feed.ImageMode(bf.ImageMode)
+			existing.ImageMode = feed.NormalizeImageMode(bf.ImageMode)
 			existing.PlaceholderImageURL = bf.PlaceholderImageURL
 
 			updated, err := h.feeds.Update(ctx, existing)
@@ -225,39 +235,22 @@ func (h *SettingsHandler) Import(c *echo.Context) error {
 			h.poller.StartFeed(updated)
 			h.poller.ForceRefresh(feedID)
 		} else {
-			scrapeMethod := feed.ScrapeMethod(bf.ScrapeMethod)
-			if scrapeMethod != feed.ScrapeMethodReadability && scrapeMethod != feed.ScrapeMethodSelector {
-				scrapeMethod = feed.ScrapeMethodReadability
-			}
-			selectorType := feed.SelectorType(bf.ScrapeSelectorType)
-			if selectorType != feed.SelectorTypeCSS && selectorType != feed.SelectorTypeXPath {
-				selectorType = feed.SelectorTypeCSS
-			}
-			imageMode := feed.ImageMode(bf.ImageMode)
-			if imageMode == "extract" {
-				imageMode = feed.ImageModeNone
-			}
-			if imageMode != feed.ImageModeNone && imageMode != feed.ImageModePlaceholder &&
-				imageMode != feed.ImageModeRandom && imageMode != feed.ImageModeBuiltin {
-				imageMode = feed.ImageModeRandom
-			}
-
 			created, err := h.feeds.Create(ctx, &feed.Feed{
-				Name:                 bf.Name,
-				URL:                  bf.URL,
-				Enabled:              bf.Enabled,
-				PollIntervalSeconds:  bf.PollIntervalSeconds,
-				UserAgent:            bf.UserAgent,
-				ScrapeFullContent:    bf.ScrapeFullContent,
-				ScrapeMethod:         scrapeMethod,
-				ScrapeSelector:       bf.ScrapeSelector,
-				ScrapeSelectorType:   selectorType,
-				ScrapeMaxAgeDays:     bf.ScrapeMaxAgeDays,
-				ScrapeCookies:        bf.ScrapeCookies,
+				Name:                     bf.Name,
+				URL:                      bf.URL,
+				Enabled:                  bf.Enabled,
+				PollIntervalSeconds:      bf.PollIntervalSeconds,
+				UserAgent:                bf.UserAgent,
+				ScrapeFullContent:        bf.ScrapeFullContent,
+				ScrapeMethod:             feed.NormalizeScrapeMethod(bf.ScrapeMethod),
+				ScrapeSelector:           bf.ScrapeSelector,
+				ScrapeSelectorType:       feed.NormalizeSelectorType(bf.ScrapeSelectorType),
+				ScrapeMaxAgeDays:         bf.ScrapeMaxAgeDays,
+				ScrapeCookies:            bf.ScrapeCookies,
 				ScrapeStripSelectors:     bf.ScrapeStripSelectors,
 				ScrapePageStripSelectors: bf.ScrapePageStripSelectors,
-				ImageMode:                imageMode,
-				PlaceholderImageURL:  bf.PlaceholderImageURL,
+				ImageMode:                feed.NormalizeImageMode(bf.ImageMode),
+				PlaceholderImageURL:      bf.PlaceholderImageURL,
 			})
 			if err != nil {
 				slog.Error("import: create feed", "url", bf.URL, "err", err)
@@ -276,15 +269,12 @@ func (h *SettingsHandler) Import(c *echo.Context) error {
 		}
 		for _, br := range bf.FilterRules {
 			rt := filterrule.RuleType(br.RuleType)
-			if rt != filterrule.RuleTypeWhitelist && rt != filterrule.RuleTypeBlacklist {
+			if !rt.Valid() {
 				slog.Warn("import: skipping rule with invalid type", "feed_url", bf.URL, "type", br.RuleType)
 				continue
 			}
 			mf := filterrule.MatchField(br.MatchField)
-			switch mf {
-			case filterrule.MatchFieldTitle, filterrule.MatchFieldURL,
-				filterrule.MatchFieldContent, filterrule.MatchFieldDescription:
-			default:
+			if !mf.Valid() {
 				slog.Warn("import: skipping rule with invalid field", "feed_url", bf.URL, "field", br.MatchField)
 				continue
 			}
@@ -310,8 +300,22 @@ func (h *SettingsHandler) Import(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load existing channels")
 	}
 	channelBySlug := make(map[string]*channel.Channel, len(existingChannels))
-	for _, ch := range existingChannels {
+	existingChannelIDs := make([]string, len(existingChannels))
+	for i, ch := range existingChannels {
 		channelBySlug[ch.Slug] = ch
+		existingChannelIDs[i] = ch.ID
+	}
+
+	// Pre-load current feed memberships for all existing channels so the
+	// reconciliation loop below doesn't issue a query per channel.
+	existingRefs, err := h.channels.ListFeedRefs(ctx, existingChannelIDs)
+	if err != nil {
+		slog.Error("import: list channel feeds", "err", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channel feeds")
+	}
+	feedIDsByChannel := make(map[string][]string, len(existingChannels))
+	for _, ref := range existingRefs {
+		feedIDsByChannel[ref.ChannelID] = append(feedIDsByChannel[ref.ChannelID], ref.FeedID)
 	}
 
 	for _, bc := range doc.Channels {
@@ -345,14 +349,9 @@ func (h *SettingsHandler) Import(c *echo.Context) error {
 			channelID = created.ID
 		}
 
-		currentFeeds, err := h.channels.ListFeeds(ctx, channelID)
-		if err != nil {
-			slog.Error("import: list channel feeds", "channel_id", channelID, "err", err)
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load channel feeds")
-		}
-		for _, f := range currentFeeds {
-			if err := h.channels.RemoveFeed(ctx, channelID, f.ID); err != nil {
-				slog.Error("import: remove channel feed", "channel_id", channelID, "feed_id", f.ID, "err", err)
+		for _, fid := range feedIDsByChannel[channelID] {
+			if err := h.channels.RemoveFeed(ctx, channelID, fid); err != nil {
+				slog.Error("import: remove channel feed", "channel_id", channelID, "feed_id", fid, "err", err)
 				return echo.NewHTTPError(http.StatusInternalServerError, "failed to clear channel feeds")
 			}
 		}

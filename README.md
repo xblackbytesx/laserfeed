@@ -59,6 +59,10 @@ The development stack uses [air](https://github.com/air-verse/air) for live relo
 
 **Prerequisites:** Docker (with Compose support).
 
+> If you do build or run the test suite **outside** Docker, you need **Go 1.26+** (the
+> version pinned in `go.mod` and the Docker images) and the matching `templ` CLI
+> (`go install github.com/a-h/templ/cmd/templ@v0.3.1020 && templ generate`).
+
 ```bash
 git clone https://github.com/xblackbytesx/laserfeed.git
 cd laserfeed
@@ -87,6 +91,14 @@ make logs     # follow app logs
 ---
 
 ## Self-hosting (production)
+
+> **⚠️ Security: no built-in authentication.** LaserFeed has no login — anyone who can
+> reach the app has full control of the admin UI (adding feeds, editing settings,
+> exporting backups). It is designed for **private, internal/trusted-network use** and
+> must not be exposed to the public internet without protection. Put authentication on
+> your reverse proxy (e.g. Traefik/Caddy/nginx basic auth or forward-auth), restrict it to
+> a VPN/LAN, or both. Only the read-only RSS output (`/channels/:slug/feed.rss`, `/feed.rss`)
+> and `/health` are meant to be reachable by feed consumers.
 
 ### 1. Prerequisites
 
@@ -244,6 +256,10 @@ docker compose exec -T db psql -U laserfeed laserfeed < backup.sql
 ```
 
 You can also use the built-in **Settings > Export** to download a JSON backup of all feeds, filters, and channels, and **Settings > Import** to restore it.
+
+> **Note:** JSON exports include any per-feed scrape **cookies** in plaintext (these are
+> the credentials used to get past cookie/paywalls). Treat exported backups as secrets —
+> store them securely and don't commit them to a repository.
 
 ---
 
