@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -53,18 +54,41 @@ func (c *atomCache) get(key string) (atomCacheEntry, bool) {
 }
 
 // set stores body under key with a freshly computed ETag and returns the entry.
+// When the body is unchanged from the previous entry, its generatedAt (and thus
+// the Last-Modified header) is carried forward so If-Modified-Since validators
+// stay stable while the content does.
 func (c *atomCache) set(key string, body []byte) atomCacheEntry {
 	now := time.Now()
+	etag := computeETag(body)
+	c.mu.Lock()
+	generatedAt := now
+	if prev, ok := c.entries[key]; ok && prev.etag == etag {
+		generatedAt = prev.generatedAt
+	}
 	e := atomCacheEntry{
 		body:        body,
-		etag:        computeETag(body),
-		generatedAt: now,
+		etag:        etag,
+		generatedAt: generatedAt,
 		expires:     now.Add(atomCacheTTL),
 	}
-	c.mu.Lock()
 	c.entries[key] = e
 	c.mu.Unlock()
 	return e
+}
+
+// invalidate drops a cached channel feed (e.g. after the channel is edited or
+// deleted) so the old output doesn't linger for the rest of its TTL.
+func (c *atomCache) invalidate(key string) {
+	c.mu.Lock()
+	delete(c.entries, key)
+	c.mu.Unlock()
+}
+
+// invalidateAll clears the cache; used after bulk changes like imports.
+func (c *atomCache) invalidateAll() {
+	c.mu.Lock()
+	c.entries = make(map[string]atomCacheEntry)
+	c.mu.Unlock()
 }
 
 func computeETag(body []byte) string {
@@ -92,6 +116,29 @@ func NewFeedOutHandler(channels channel.Repository, articles article.Repository,
 	}
 }
 
+// InvalidateChannel drops the cached Atom output for a channel slug so edits
+// and deletions take effect immediately instead of after the cache TTL.
+func (h *FeedOutHandler) InvalidateChannel(slug string) {
+	h.cache.invalidate(slug)
+}
+
+// InvalidateAll drops all cached Atom output (e.g. after an import).
+func (h *FeedOutHandler) InvalidateAll() {
+	h.cache.invalidateAll()
+}
+
+// etagMatches reports whether an If-None-Match header matches etag, tolerating
+// weak validators ("W/") and comma-separated candidate lists.
+func etagMatches(header, etag string) bool {
+	for _, candidate := range strings.Split(header, ",") {
+		candidate = strings.TrimPrefix(strings.TrimSpace(candidate), "W/")
+		if candidate == etag || candidate == "*" {
+			return true
+		}
+	}
+	return false
+}
+
 // writeFeed emits the feed with cache-validator headers, returning 304 when the
 // client's If-None-Match already matches the current ETag.
 func (h *FeedOutHandler) writeFeed(c *echo.Context, e atomCacheEntry) error {
@@ -99,7 +146,7 @@ func (h *FeedOutHandler) writeFeed(c *echo.Context, e atomCacheEntry) error {
 	hdr.Set("ETag", e.etag)
 	hdr.Set("Last-Modified", e.generatedAt.UTC().Format(http.TimeFormat))
 	hdr.Set("Cache-Control", fmt.Sprintf("public, max-age=%d", int(atomCacheTTL.Seconds())))
-	if match := c.Request().Header.Get("If-None-Match"); match != "" && match == e.etag {
+	if match := c.Request().Header.Get("If-None-Match"); match != "" && etagMatches(match, e.etag) {
 		return c.NoContent(http.StatusNotModified)
 	}
 	return c.Blob(http.StatusOK, "application/atom+xml; charset=utf-8", e.body)

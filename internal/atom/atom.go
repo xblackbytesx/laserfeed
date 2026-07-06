@@ -78,7 +78,19 @@ type mediaThumbnail struct {
 }
 
 func GenerateAtom(ch *channel.Channel, articles []*article.Article, feedsByID map[string]*feed.Feed, appBaseURL string) ([]byte, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
+	// The feed-level updated timestamp is the newest entry's publish time, not
+	// generation time: the output (and therefore its ETag/Last-Modified) must
+	// stay byte-identical across regenerations when nothing changed, so client
+	// conditional GETs can actually hit 304.
+	updated := time.Time{}
+	for _, a := range articles {
+		if a.PublishedAt.After(updated) {
+			updated = a.PublishedAt
+		}
+	}
+	if updated.IsZero() {
+		updated = time.Now()
+	}
 	selfURL := fmt.Sprintf("%s/channels/%s/feed.rss", appBaseURL, ch.Slug)
 	channelURL := fmt.Sprintf("%s/channels/%s", appBaseURL, ch.Slug)
 
@@ -87,7 +99,7 @@ func GenerateAtom(ch *channel.Channel, articles []*article.Article, feedsByID ma
 		MediaNS: "http://search.yahoo.com/mrss/",
 		Title:   xmlSafe(ch.Name),
 		ID:      channelURL,
-		Updated: now,
+		Updated: updated.UTC().Format(time.RFC3339),
 		Link: []atomLink{
 			{Href: selfURL, Rel: "self", Type: "application/atom+xml"},
 			{Href: channelURL, Rel: "alternate"},

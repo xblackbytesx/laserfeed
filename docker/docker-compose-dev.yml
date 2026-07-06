@@ -11,6 +11,9 @@ services:
       APP_BASE_URL: http://localhost:8080
       PORT: "8080"
       SECURE_COOKIES: "false"
+      # Uncomment together with the laserfeed-chrome service below to work on
+      # the "Render JavaScript" feature.
+      # JS_RENDER_WS_URL: ws://laserfeed-chrome:9222/
     volumes:
       - ..:/app
       # Anonymous volume shadows the bind-mount for the vendor directory so
@@ -36,6 +39,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Optional: headless browser for the "Render JavaScript" feature.
+  # laserfeed-chrome:
+  #   image: chromedp/headless-shell:latest
 
 volumes:
   pgdata_dev:

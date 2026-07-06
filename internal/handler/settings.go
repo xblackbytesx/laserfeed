@@ -20,6 +20,7 @@ type SettingsHandler struct {
 	filterRules filterrule.Repository
 	channels    channel.Repository
 	poller      *poller.Manager
+	feedOut     *FeedOutHandler // for invalidating cached Atom output after imports
 }
 
 func NewSettingsHandler(
@@ -28,8 +29,9 @@ func NewSettingsHandler(
 	fr filterrule.Repository,
 	ch channel.Repository,
 	pm *poller.Manager,
+	feedOut *FeedOutHandler,
 ) *SettingsHandler {
-	return &SettingsHandler{settings: s, feeds: f, filterRules: fr, channels: ch, poller: pm}
+	return &SettingsHandler{settings: s, feeds: f, filterRules: fr, channels: ch, poller: pm, feedOut: feedOut}
 }
 
 func (h *SettingsHandler) Get(c *echo.Context) error {

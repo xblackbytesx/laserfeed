@@ -109,7 +109,13 @@ func bestImgSrc(html string) string {
 	doc.Find("img").Each(func(_ int, s *goquery.Selection) {
 		src, exists := s.Attr("src")
 		if !exists || src == "" {
-			return
+			// Responsive images may carry only a srcset.
+			if srcset, ok := s.Attr("srcset"); ok {
+				src = srcsetBest(srcset)
+			}
+			if src == "" {
+				return
+			}
 		}
 
 		w := attrInt(s, "width")
@@ -136,6 +142,30 @@ func bestImgSrc(html string) string {
 		return bestURL
 	}
 	return firstURL
+}
+
+// srcsetBest returns the URL of the srcset entry with the largest width (Nw)
+// or density (Nx) descriptor, falling back to the first parseable entry.
+func srcsetBest(srcset string) string {
+	bestURL := ""
+	bestVal := -1.0
+	for _, part := range strings.Split(srcset, ",") {
+		fields := strings.Fields(strings.TrimSpace(part))
+		if len(fields) == 0 || fields[0] == "" {
+			continue
+		}
+		val := 0.0
+		if len(fields) > 1 {
+			if n, err := strconv.ParseFloat(strings.TrimRight(fields[1], "wx"), 64); err == nil {
+				val = n
+			}
+		}
+		if val > bestVal {
+			bestVal = val
+			bestURL = fields[0]
+		}
+	}
+	return bestURL
 }
 
 func attrInt(s *goquery.Selection, name string) int {

@@ -82,6 +82,7 @@ type Feed struct {
 	ScrapeSelector           *string
 	ScrapeSelectorType       SelectorType
 	ScrapeMaxAgeDays         int     // 0 = keep forever
+	ScrapeRenderJS           bool    // render pages in a headless browser before extraction
 	ScrapeCookies            *string // raw Cookie header value, e.g. "foo=bar; baz=qux"
 	ScrapeStripSelectors     *string // newline-separated CSS selectors to remove from scraped content
 	ScrapePageStripSelectors *string // newline-separated CSS selectors to remove from the full page before extraction

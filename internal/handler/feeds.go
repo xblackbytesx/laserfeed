@@ -188,6 +188,7 @@ func (h *FeedHandler) Update(c *echo.Context) error {
 	f.Enabled = c.FormValue("enabled") == "true"
 	f.PollIntervalSeconds = pollInterval
 	f.ScrapeFullContent = c.FormValue("scrape_full_content") == "true"
+	f.ScrapeRenderJS = c.FormValue("scrape_render_js") == "true"
 	f.ScrapeMaxAgeDays = scrapeMaxAge
 	f.RetentionMaxItems = retentionMaxItems
 	f.RetentionMaxHours = retentionMaxHours

@@ -16,14 +16,35 @@ import (
 	"github.com/laserfeed/laserfeed/internal/domain/settings"
 	"github.com/laserfeed/laserfeed/internal/filter"
 	"github.com/laserfeed/laserfeed/internal/scraper"
+	"github.com/mmcdole/gofeed"
 )
 
+// itemGUID returns the stable identifier for a feed item, falling back to the
+// link when the feed provides no GUID.
+func itemGUID(item *gofeed.Item) string {
+	if item.GUID != "" {
+		return item.GUID
+	}
+	return item.Link
+}
+
+// rulesMatchContent reports whether any rule matches on the content field.
+func rulesMatchContent(rules []*filterrule.FilterRule) bool {
+	for _, r := range rules {
+		if r.MatchField == filterrule.MatchFieldContent {
+			return true
+		}
+	}
+	return false
+}
+
 type Stores struct {
-	Feeds       feed.Repository
-	Articles    article.Repository
-	FilterRules filterrule.Repository
-	Settings    settings.Repository
-	AppBaseURL  string // used to build absolute URLs for built-in placeholder images
+	Feeds         feed.Repository
+	Articles      article.Repository
+	FilterRules   filterrule.Repository
+	Settings      settings.Repository
+	AppBaseURL    string // used to build absolute URLs for built-in placeholder images
+	JSRenderWSURL string // optional CDP endpoint for JS rendering (JS_RENDER_WS_URL)
 }
 
 // builtinSVGs is the ordered list of built-in placeholder image filenames.
@@ -75,19 +96,9 @@ func redactURLUserinfo(raw string) string {
 	return u.String()
 }
 
-// scrapeParams holds the resolved scraping configuration for a single feed,
-// merging per-feed overrides on top of global defaults.
-type scrapeParams struct {
-	userAgent          string
-	method             string
-	selector           string
-	selectorType       string
-	cookies            string
-	stripSelectors     []string
-	pageStripSelectors []string
-}
-
-func resolveScrapeParams(f *feed.Feed, globalUA string) scrapeParams {
+// resolveScrapeParams merges per-feed overrides on top of global defaults into
+// the options passed to the scraper.
+func resolveScrapeParams(f *feed.Feed, globalUA string) scraper.ScrapeOptions {
 	ua := globalUA
 	if f.UserAgent != nil && *f.UserAgent != "" {
 		ua = *f.UserAgent
@@ -116,14 +127,15 @@ func resolveScrapeParams(f *feed.Feed, globalUA string) scrapeParams {
 			}
 		}
 	}
-	return scrapeParams{
-		userAgent:          ua,
-		method:             string(f.ScrapeMethod),
-		selector:           sel,
-		selectorType:       string(f.ScrapeSelectorType),
-		cookies:            ck,
-		stripSelectors:     stripSelectors,
-		pageStripSelectors: pageStripSelectors,
+	return scraper.ScrapeOptions{
+		UserAgent:          ua,
+		Method:             string(f.ScrapeMethod),
+		Selector:           sel,
+		SelectorType:       string(f.ScrapeSelectorType),
+		Cookies:            ck,
+		StripSelectors:     stripSelectors,
+		PageStripSelectors: pageStripSelectors,
+		RenderJS:           f.ScrapeRenderJS,
 	}
 }
 
@@ -166,7 +178,7 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 	}
 
 	now := time.Now()
-	result, err := sc.FetchFeed(ctx, f.URL, sp.userAgent, f.PollETag, f.PollLastModified)
+	result, err := sc.FetchFeed(ctx, f.URL, sp.UserAgent, f.PollETag, f.PollLastModified)
 	if err != nil {
 		errStr := err.Error()
 		if statusErr := stores.Feeds.UpdatePollStatus(ctx, feedID, now, &errStr); statusErr != nil {
@@ -200,6 +212,25 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		rules = nil
 	}
 
+	// Skip items that retention already deleted; without this, an item deleted
+	// by count/age retention but still listed in the source feed would be
+	// re-ingested (and re-scraped) every poll, then deleted again at the end of
+	// the cycle. Failure to load tombstones fails open (items are re-ingested).
+	tombstoned, err := stores.Articles.GetTombstonedGUIDs(ctx, feedID)
+	if err != nil {
+		slog.Warn("poller: get tombstoned guids", "feed_id", feedID, "err", err)
+		tombstoned = map[string]bool{}
+	}
+	items := parsedFeed.Items
+	if len(tombstoned) > 0 {
+		items = make([]*gofeed.Item, 0, len(parsedFeed.Items))
+		for _, item := range parsedFeed.Items {
+			if !tombstoned[itemGUID(item)] {
+				items = append(items, item)
+			}
+		}
+	}
+
 	// Pre-fetch GUIDs that already have successfully scraped content so we skip
 	// redundant HTTP requests for them on subsequent polls.
 	scrapedGUIDs := map[string]bool{}
@@ -211,6 +242,19 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		}
 	}
 
+	// When content-matching rules exist, filter evaluation for already-scraped
+	// articles must see the stored full content — the feed item only carries an
+	// excerpt, so is_filtered_out would otherwise flip depending on whether the
+	// article was scraped this cycle or a previous one.
+	storedContents := map[string]string{}
+	if f.ScrapeFullContent && rulesMatchContent(rules) {
+		if contents, err := stores.Articles.GetScrapedContents(ctx, feedID); err == nil {
+			storedContents = contents
+		} else {
+			slog.Warn("poller: get scraped contents", "feed_id", feedID, "err", err)
+		}
+	}
+
 	// Phase 1: decide which items need a network scrape this cycle.
 	type itemWork struct {
 		guid        string
@@ -218,12 +262,9 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 		scraped     string
 		scrapeErr   error
 	}
-	works := make([]itemWork, len(parsedFeed.Items))
-	for i, item := range parsedFeed.Items {
-		guid := item.GUID
-		if guid == "" {
-			guid = item.Link
-		}
+	works := make([]itemWork, len(items))
+	for i, item := range items {
+		guid := itemGUID(item)
 		works[i] = itemWork{
 			guid:        guid,
 			needsScrape: f.ScrapeFullContent && item.Link != "" && !scrapedGUIDs[guid],
@@ -245,14 +286,14 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 			go func(w *itemWork, link string) {
 				defer wg.Done()
 				defer func() { <-sem }()
-				w.scraped, w.scrapeErr = sc.ScrapeContent(ctx, link, sp.userAgent, sp.method, sp.selector, sp.selectorType, sp.cookies, sp.stripSelectors, sp.pageStripSelectors)
-			}(&works[i], parsedFeed.Items[i].Link)
+				w.scraped, w.scrapeErr = sc.ScrapeContent(ctx, link, sp)
+			}(&works[i], items[i].Link)
 		}
 		wg.Wait()
 	}
 
 	// Phase 3: build and upsert each article from its (possibly scraped) content.
-	for i, item := range parsedFeed.Items {
+	for i, item := range items {
 		w := &works[i]
 		guid := w.guid
 
@@ -267,8 +308,8 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 			scrapeError = w.scrapeErr.Error()
 			content = scraper.SanitizeHTML(item.Content)
 		case w.needsScrape && strings.TrimSpace(w.scraped) == "":
-			if sp.method == "selector" {
-				scrapeError = fmt.Sprintf("selector %q matched no content", sp.selector)
+			if sp.Method == "selector" {
+				scrapeError = fmt.Sprintf("selector %q matched no content", sp.Selector)
 			} else {
 				scrapeError = "readability could not extract content from the page"
 			}
@@ -279,9 +320,15 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 			scrapeStatus = article.ScrapeStatusSuccess
 			content = w.scraped
 		case scrapedGUIDs[guid]:
-			// Already scraped — upsert preserves the stored content.
+			// Already scraped — upsert preserves the stored content. Evaluate
+			// filters against that stored content when it was loaded (i.e. when
+			// content rules exist), not the feed excerpt.
 			scrapeStatus = article.ScrapeStatusSuccess
-			content = scraper.SanitizeHTML(item.Content)
+			if stored, ok := storedContents[guid]; ok {
+				content = stored
+			} else {
+				content = scraper.SanitizeHTML(item.Content)
+			}
 		default:
 			scrapeStatus = article.ScrapeStatusNone
 			content = scraper.SanitizeHTML(item.Content)
@@ -339,7 +386,8 @@ func pollOnce(ctx context.Context, feedID string, stores Stores, sc *scraper.Scr
 
 	runRetention(ctx, f, stores, globalSettings)
 
-	slog.Info("poller: done", "feed_id", feedID, "items", len(parsedFeed.Items))
+	slog.Info("poller: done", "feed_id", feedID, "items", len(items),
+		"tombstoned_skipped", len(parsedFeed.Items)-len(items))
 }
 
 // runRetention applies a feed's content-purge and article-retention policies.

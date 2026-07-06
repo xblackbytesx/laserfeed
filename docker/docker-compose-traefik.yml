@@ -6,6 +6,10 @@ networks:
     external: true
   internal:
     internal: true
+  # Uncomment together with the laserfeed-chrome service below. The internal
+  # network has no internet access, so the browser needs this extra
+  # outbound-capable network to load pages.
+  # chrome-egress: {}
 
 volumes:
   laserfeed-database:
@@ -54,6 +58,7 @@ services:
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
       PORT: "8080"
       SECURE_COOKIES: ${SECURE_COOKIES:-true}
+      JS_RENDER_WS_URL: ${JS_RENDER_WS_URL:-}
     volumes:
       - /etc/localtime:/etc/localtime:ro
     labels:
@@ -69,3 +74,23 @@ services:
       laserfeed-db:
         condition: service_healthy
     restart: unless-stopped
+
+  # Optional: headless browser for feeds with "Render JavaScript" enabled.
+  # Uncomment this service and the chrome-egress network above, then set
+  # JS_RENDER_WS_URL=ws://laserfeed-chrome:9222/ in .env.
+  #
+  # SECURITY: pages rendered here execute arbitrary JavaScript and fetch
+  # subresources with the browser's own network stack, outside the app's
+  # SSRF guard (the app pre-checks only the article URL itself). Keep this
+  # container off networks that can reach sensitive internal services.
+  # laserfeed-chrome:
+  #   container_name: laserfeed-chrome
+  #   image: chromedp/headless-shell:latest
+  #   security_opt:
+  #     - no-new-privileges:true
+  #   labels:
+  #     - "traefik.enable=false"
+  #   networks:
+  #     - internal       # reachable by the app
+  #     - chrome-egress  # outbound internet for page loads
+  #   restart: unless-stopped

@@ -64,20 +64,21 @@ func main() {
 	channelStore := repository.NewChannelStore(pool)
 
 	pollerManager := poller.NewManager(ctx, poller.Stores{
-		Feeds:       feedStore,
-		Articles:    articleStore,
-		FilterRules: filterRuleStore,
-		Settings:    settingsStore,
-		AppBaseURL:  cfg.AppBaseURL,
+		Feeds:         feedStore,
+		Articles:      articleStore,
+		FilterRules:   filterRuleStore,
+		Settings:      settingsStore,
+		AppBaseURL:    cfg.AppBaseURL,
+		JSRenderWSURL: cfg.JSRenderWSURL,
 	})
 	go pollerManager.Start()
 
 	dashHandler := handler.NewDashboardHandler(articleStore, channelStore)
 	feedHandler := handler.NewFeedHandler(feedStore, articleStore, filterRuleStore, pollerManager)
 	rulesHandler := handler.NewRulesHandler(feedStore, filterRuleStore)
-	channelHandler := handler.NewChannelHandler(channelStore, feedStore)
-	settingsHandler := handler.NewSettingsHandler(settingsStore, feedStore, filterRuleStore, channelStore, pollerManager)
 	feedOutHandler := handler.NewFeedOutHandler(channelStore, articleStore, feedStore, cfg.AppBaseURL)
+	channelHandler := handler.NewChannelHandler(channelStore, feedStore, feedOutHandler)
+	settingsHandler := handler.NewSettingsHandler(settingsStore, feedStore, filterRuleStore, channelStore, pollerManager, feedOutHandler)
 
 	e := echo.New()
 	e.Use(echomiddleware.Recover())
@@ -182,7 +183,7 @@ func main() {
 
 	serverErrCh := make(chan error, 1)
 	go func() {
-		slog.Info("starting server", "addr", addr, "secure_cookies", cfg.SecureCookies)
+		slog.Info("starting server", "addr", addr, "secure_cookies", cfg.SecureCookies, "js_render", cfg.JSRenderWSURL != "")
 		serverErrCh <- srv.ListenAndServe()
 	}()
 

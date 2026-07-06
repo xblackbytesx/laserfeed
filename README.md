@@ -10,6 +10,7 @@ LaserFeed is a self-hosted RSS/Atom feed aggregator. Add feed sources to a share
 
 - **Feed pool** — add any RSS/Atom source; configure poll interval, user-agent override
 - **Full-content scraping** — fetch the actual article page and extract content via Readability (automatic) or CSS/XPath selector; reader-view sanitisation strips ads and nav
+- **JavaScript rendering** — optional headless-browser rendering (per feed) for sites that build their articles client-side
 - **Page & content strip selectors** — two-level CSS selectors to remove unwanted elements: page-level (ads, navs, banners) and content-level (scoped within the article)
 - **Cookie support** — paste a raw `Cookie` header to bypass cookie walls on paywalled sites
 - **Filter rules** — whitelist/blacklist by title, URL, description, or content with substring or glob patterns (`*`, `?`)
@@ -230,6 +231,32 @@ Use XPath (in selector mode) when the content isn't cleanly addressable with CSS
 //div[contains(@class,'post-content')]
 ```
 
+### JavaScript-rendered sites
+
+Some sites ship an empty HTML shell and build the article client-side; normal scraping
+then fails with "readability could not extract content". For those feeds, enable
+**Render JavaScript** on the feed edit page. LaserFeed loads the page in a headless
+browser, waits for client-side rendering to settle, and runs the normal extraction
+pipeline (Readability or selector, strip selectors, sanitisation) on the resulting DOM.
+
+Setup:
+
+1. Uncomment the `laserfeed-chrome` service and the `chrome-egress` network in your
+   compose file
+2. Set `JS_RENDER_WS_URL=ws://laserfeed-chrome:9222/` in `.env`
+3. `make up`, then toggle **Render JavaScript** on the feeds that need it
+
+Notes:
+
+- Rendering is much slower than a plain fetch (up to ~30 s per page); leave it off
+  unless a feed actually needs it. A large backlog may take several poll cycles to
+  scrape fully — failed articles are retried on the next poll.
+- **Security:** rendered pages execute arbitrary JavaScript inside the browser
+  container, and the browser fetches redirects/subresources with its own network
+  stack — outside the app's SSRF guard, which pre-checks only the article URL.
+  Keep the container on isolated networks (the shipped compose config does this)
+  and away from anything sensitive on your LAN.
+
 ### Cookie walls (e.g. regional news sites)
 
 1. Open the site in your browser and log in or accept cookies
@@ -273,6 +300,7 @@ You can also use the built-in **Settings > Export** to download a JSON backup of
 | `APP_BASE_URL` | No | `http://localhost:8080` | Public URL, used in Atom feed self-links |
 | `PORT` | No | `8080` | Port the HTTP server binds to |
 | `SECURE_COOKIES` | No | `true` | Set `false` when running over plain HTTP (dev only) |
+| `JS_RENDER_WS_URL` | No | — | DevTools websocket endpoint of the optional headless browser for [JavaScript rendering](#javascript-rendered-sites) (e.g. `ws://laserfeed-chrome:9222/`) |
 
 ---
 

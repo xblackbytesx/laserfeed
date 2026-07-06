@@ -17,14 +17,19 @@ type Config struct {
 	AppBaseURL    string
 	Port          string
 	SecureCookies bool // should be true in production (HTTPS); set SECURE_COOKIES=false for local HTTP
+	// JSRenderWSURL is the optional DevTools endpoint of a headless browser
+	// (e.g. "ws://laserfeed-chrome:9222/") used by feeds with JS rendering
+	// enabled. Empty disables the feature.
+	JSRenderWSURL string
 }
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		CSRFAuthKey: os.Getenv("CSRF_AUTH_KEY"),
-		AppBaseURL:  os.Getenv("APP_BASE_URL"),
-		Port:        os.Getenv("PORT"),
+		DatabaseURL:   os.Getenv("DATABASE_URL"),
+		CSRFAuthKey:   os.Getenv("CSRF_AUTH_KEY"),
+		AppBaseURL:    os.Getenv("APP_BASE_URL"),
+		Port:          os.Getenv("PORT"),
+		JSRenderWSURL: os.Getenv("JS_RENDER_WS_URL"),
 	}
 
 	// Default to true; reject typos like "False" or "0" rather than silently

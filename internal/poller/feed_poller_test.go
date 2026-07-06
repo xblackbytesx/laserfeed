@@ -60,31 +60,38 @@ func TestResolveScrapeParams(t *testing.T) {
 		ScrapeCookies:            &cookies,
 		ScrapeStripSelectors:     &strip,
 		ScrapePageStripSelectors: &pageStrip,
+		ScrapeRenderJS:           true,
 	}
 
 	sp := resolveScrapeParams(f, "global-agent")
-	if sp.userAgent != ua {
-		t.Errorf("userAgent: got %q, want %q", sp.userAgent, ua)
+	if sp.UserAgent != ua {
+		t.Errorf("UserAgent: got %q, want %q", sp.UserAgent, ua)
 	}
-	if sp.method != "selector" || sp.selectorType != "xpath" {
-		t.Errorf("method/type: got %q/%q", sp.method, sp.selectorType)
+	if sp.Method != "selector" || sp.SelectorType != "xpath" {
+		t.Errorf("method/type: got %q/%q", sp.Method, sp.SelectorType)
 	}
-	if sp.cookies != cookies {
-		t.Errorf("cookies: got %q", sp.cookies)
+	if sp.Cookies != cookies {
+		t.Errorf("cookies: got %q", sp.Cookies)
 	}
 	// Strip selectors are split per line and trimmed, blanks dropped.
-	if len(sp.stripSelectors) != 2 || sp.stripSelectors[0] != ".ad" || sp.stripSelectors[1] != ".promo" {
-		t.Errorf("stripSelectors: got %#v", sp.stripSelectors)
+	if len(sp.StripSelectors) != 2 || sp.StripSelectors[0] != ".ad" || sp.StripSelectors[1] != ".promo" {
+		t.Errorf("StripSelectors: got %#v", sp.StripSelectors)
 	}
-	if len(sp.pageStripSelectors) != 2 {
-		t.Errorf("pageStripSelectors: got %#v", sp.pageStripSelectors)
+	if len(sp.PageStripSelectors) != 2 {
+		t.Errorf("PageStripSelectors: got %#v", sp.PageStripSelectors)
+	}
+	if !sp.RenderJS {
+		t.Error("RenderJS: expected true")
 	}
 }
 
 func TestResolveScrapeParamsGlobalUAFallback(t *testing.T) {
 	f := &feed.Feed{ScrapeMethod: feed.ScrapeMethodReadability}
 	sp := resolveScrapeParams(f, "global-agent")
-	if sp.userAgent != "global-agent" {
-		t.Errorf("expected global UA fallback, got %q", sp.userAgent)
+	if sp.UserAgent != "global-agent" {
+		t.Errorf("expected global UA fallback, got %q", sp.UserAgent)
+	}
+	if sp.RenderJS {
+		t.Error("RenderJS: expected false by default")
 	}
 }

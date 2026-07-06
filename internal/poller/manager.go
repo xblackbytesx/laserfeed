@@ -43,7 +43,7 @@ func NewManager(ctx context.Context, stores Stores) *Manager {
 		states:   make(map[string]*feedPollState),
 		scraping: make(map[string]*scrapeState),
 		stores:   stores,
-		scraper:  scraper.New(),
+		scraper:  scraper.New(stores.JSRenderWSURL),
 	}
 }
 
@@ -196,14 +196,14 @@ func (m *Manager) ReScrapeArticles(feedID string) {
 			default:
 			}
 
-			scraped, err := m.scraper.ScrapeContent(ctx, ref.URL, sp.userAgent, sp.method, sp.selector, sp.selectorType, sp.cookies, sp.stripSelectors, sp.pageStripSelectors)
+			scraped, err := m.scraper.ScrapeContent(ctx, ref.URL, sp)
 			var errMsg string
 			switch {
 			case err != nil:
 				errMsg = err.Error()
 			case strings.TrimSpace(scraped) == "":
-				if sp.method == "selector" {
-					errMsg = fmt.Sprintf("selector %q matched no content", sp.selector)
+				if sp.Method == "selector" {
+					errMsg = fmt.Sprintf("selector %q matched no content", sp.Selector)
 				} else {
 					errMsg = "readability could not extract content from the page"
 				}

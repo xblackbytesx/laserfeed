@@ -17,10 +17,11 @@ var slugRe = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 type ChannelHandler struct {
 	channels channel.Repository
 	feeds    feed.Repository
+	feedOut  *FeedOutHandler // for invalidating cached Atom output on changes
 }
 
-func NewChannelHandler(channels channel.Repository, feeds feed.Repository) *ChannelHandler {
-	return &ChannelHandler{channels: channels, feeds: feeds}
+func NewChannelHandler(channels channel.Repository, feeds feed.Repository, feedOut *FeedOutHandler) *ChannelHandler {
+	return &ChannelHandler{channels: channels, feeds: feeds, feedOut: feedOut}
 }
 
 func (h *ChannelHandler) List(c *echo.Context) error {
@@ -74,6 +75,7 @@ func (h *ChannelHandler) Update(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	oldSlug := ch.Slug
 	ch.Name = name
 	ch.Slug = slug
 	ch.Description = desc
@@ -81,14 +83,24 @@ func (h *ChannelHandler) Update(c *echo.Context) error {
 		slog.Error("update channel", "channel_id", ch.ID, "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to update channel")
 	}
+	// Drop cached output under both slugs so a rename doesn't leave the old
+	// URL serving a ghost feed for the rest of the cache TTL.
+	h.feedOut.InvalidateChannel(oldSlug)
+	h.feedOut.InvalidateChannel(slug)
 	return redirect(c, "/channels/"+ch.ID+"/edit")
 }
 
 func (h *ChannelHandler) Delete(c *echo.Context) error {
-	if err := h.channels.Delete(c.Request().Context(), c.Param("id")); err != nil {
-		slog.Error("delete channel", "channel_id", c.Param("id"), "err", err)
+	ctx := c.Request().Context()
+	ch, err := h.channels.GetByID(ctx, c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "channel not found")
+	}
+	if err := h.channels.Delete(ctx, ch.ID); err != nil {
+		slog.Error("delete channel", "channel_id", ch.ID, "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete channel")
 	}
+	h.feedOut.InvalidateChannel(ch.Slug)
 	return redirect(c, "/channels")
 }
 
@@ -100,10 +112,16 @@ func (h *ChannelHandler) AddFeed(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "feed_id is required")
 	}
 
+	ch, err := h.channels.GetByID(ctx, channelID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "channel not found")
+	}
+
 	if err := h.channels.AddFeed(ctx, channelID, feedID); err != nil {
 		slog.Error("add feed to channel", "channel_id", channelID, "feed_id", feedID, "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to add feed")
 	}
+	h.feedOut.InvalidateChannel(ch.Slug)
 
 	channelFeeds, err := h.channels.ListFeeds(ctx, channelID)
 	if err != nil {
@@ -118,10 +136,16 @@ func (h *ChannelHandler) RemoveFeed(c *echo.Context) error {
 	channelID := c.Param("id")
 	feedID := c.Param("fid")
 
+	ch, err := h.channels.GetByID(ctx, channelID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "channel not found")
+	}
+
 	if err := h.channels.RemoveFeed(ctx, channelID, feedID); err != nil {
 		slog.Error("remove feed from channel", "channel_id", channelID, "feed_id", feedID, "err", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to remove feed")
 	}
+	h.feedOut.InvalidateChannel(ch.Slug)
 
 	channelFeeds, err := h.channels.ListFeeds(ctx, channelID)
 	if err != nil {

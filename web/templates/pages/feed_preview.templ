@@ -5,6 +5,7 @@ import (
 	"github.com/laserfeed/laserfeed/internal/domain/article"
 	"github.com/laserfeed/laserfeed/internal/domain/feed"
 	"github.com/laserfeed/laserfeed/internal/domain/filterrule"
+	"github.com/laserfeed/laserfeed/internal/scraper"
 	"github.com/laserfeed/laserfeed/web/templates/layouts"
 )
 
@@ -104,7 +105,10 @@ templ PreviewArticleRow(a *article.Article, scrapeEnabled bool, showRaw bool) {
 		if scrapeEnabled && a.ScrapeStatus == article.ScrapeStatusSuccess && a.Content != "" {
 			<sl-details summary="Scraped content" style="margin-top:.75rem">
 				<div class="scraped-content-preview">
-					@templ.Raw(a.Content)
+					// Stored content is sanitized at ingest; re-sanitizing here is
+					// defense-in-depth so raw rendering never depends on every write
+					// path having done it.
+					@templ.Raw(scraper.SanitizeHTML(a.Content))
 				</div>
 			</sl-details>
 		}

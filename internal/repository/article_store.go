@@ -90,6 +90,29 @@ func (s *ArticleStore) GetScrapedGUIDs(ctx context.Context, feedID string) (map[
 	return guids, rows.Err()
 }
 
+// GetScrapedContents returns guid→stored content for successfully scraped
+// articles. Loaded only when content-matching filter rules exist, so rule
+// evaluation on later polls sees the same full text it saw at scrape time.
+func (s *ArticleStore) GetScrapedContents(ctx context.Context, feedID string) (map[string]string, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT guid, content FROM articles WHERE feed_id=$1 AND scrape_status='success'`,
+		feedID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get scraped contents: %w", err)
+	}
+	defer rows.Close()
+	contents := map[string]string{}
+	for rows.Next() {
+		var guid, content string
+		if err := rows.Scan(&guid, &content); err != nil {
+			return nil, fmt.Errorf("scan scraped content: %w", err)
+		}
+		contents[guid] = content
+	}
+	return contents, rows.Err()
+}
+
 func (s *ArticleStore) UpdateScrapeResult(ctx context.Context, id, content, errMsg string) error {
 	status := article.ScrapeStatusSuccess
 	var errPtr *string
@@ -268,11 +291,19 @@ func (s *ArticleStore) ListRecent(ctx context.Context, limit, offset int) ([]*ar
 	return articles, rows.Err()
 }
 
+// DeleteOldest removes all but the keepCount newest articles of a feed.
+// Deleted GUIDs are tombstoned so the next poll does not re-ingest items the
+// retention policy removed while the source feed still lists them.
 func (s *ArticleStore) DeleteOldest(ctx context.Context, feedID string, keepCount int) error {
 	_, err := s.db.Exec(ctx,
-		`DELETE FROM articles WHERE feed_id=$1 AND id NOT IN (
-			SELECT id FROM articles WHERE feed_id=$1 ORDER BY published_at DESC LIMIT $2
-		)`,
+		`WITH doomed AS (
+			DELETE FROM articles WHERE feed_id=$1 AND id NOT IN (
+				SELECT id FROM articles WHERE feed_id=$1 ORDER BY published_at DESC LIMIT $2
+			) RETURNING guid
+		)
+		INSERT INTO article_tombstones (feed_id, guid)
+		SELECT $1, guid FROM doomed
+		ON CONFLICT DO NOTHING`,
 		feedID, keepCount,
 	)
 	if err != nil {
@@ -281,13 +312,44 @@ func (s *ArticleStore) DeleteOldest(ctx context.Context, feedID string, keepCoun
 	return nil
 }
 
+// DeleteOlderThan removes articles published more than maxHours ago,
+// tombstoning them like DeleteOldest.
 func (s *ArticleStore) DeleteOlderThan(ctx context.Context, feedID string, maxHours int) error {
 	_, err := s.db.Exec(ctx,
-		`DELETE FROM articles WHERE feed_id=$1 AND published_at < NOW() - ($2 * INTERVAL '1 hour')`,
+		`WITH doomed AS (
+			DELETE FROM articles
+			WHERE feed_id=$1 AND published_at < NOW() - ($2 * INTERVAL '1 hour')
+			RETURNING guid
+		)
+		INSERT INTO article_tombstones (feed_id, guid)
+		SELECT $1, guid FROM doomed
+		ON CONFLICT DO NOTHING`,
 		feedID, maxHours,
 	)
 	if err != nil {
 		return fmt.Errorf("delete articles older than %d hours: %w", maxHours, err)
 	}
 	return nil
+}
+
+// GetTombstonedGUIDs returns the GUIDs of articles that retention has deleted
+// for this feed; the poller skips these when ingesting.
+func (s *ArticleStore) GetTombstonedGUIDs(ctx context.Context, feedID string) (map[string]bool, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT guid FROM article_tombstones WHERE feed_id=$1`,
+		feedID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get tombstoned guids: %w", err)
+	}
+	defer rows.Close()
+	guids := map[string]bool{}
+	for rows.Next() {
+		var guid string
+		if err := rows.Scan(&guid); err != nil {
+			return nil, fmt.Errorf("scan tombstone guid: %w", err)
+		}
+		guids[guid] = true
+	}
+	return guids, rows.Err()
 }

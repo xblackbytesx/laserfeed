@@ -17,6 +17,7 @@ import (
 	"github.com/antchfx/htmlquery"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/mmcdole/gofeed"
+	"golang.org/x/net/html/charset"
 )
 
 // ErrPrivateAddress is returned by the dialer when a feed/article URL resolves
@@ -58,9 +59,21 @@ func safeDialContext(d *net.Dialer) func(ctx context.Context, network, addr stri
 				return nil, fmt.Errorf("%w: %s resolves to %s", ErrPrivateAddress, host, ip)
 			}
 		}
-		// Use the first non-private IP to avoid TOCTOU between our check and
-		// the dialer's own resolution.
-		return d.DialContext(ctx, network, net.JoinHostPort(ips[0].String(), port))
+		// Dial the checked IPs directly (not the hostname) to avoid TOCTOU
+		// between our check and a second resolution, falling back through the
+		// list so a host whose first record is unreachable — typically an AAAA
+		// record on an IPv4-only network — still connects.
+		var firstErr error
+		for _, ip := range ips {
+			conn, err := d.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+			if err == nil {
+				return conn, nil
+			}
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+		return nil, firstErr
 	}
 }
 
@@ -71,11 +84,12 @@ const maxBodySize = 5 * 1024 * 1024 // 5MB
 // abuse rather than SSRF (which the dialer already prevents).
 const maxRedirects = 5
 
-// maxConcurrentFeedFetches bounds how many feed/page fetches run at once across
-// all poll goroutines. It prevents a thundering herd (e.g. every feed's timer
-// firing at once after a restart) from opening hundreds of simultaneous
-// connections. Per-feed article scraping has its own separate cap.
-const maxConcurrentFeedFetches = 8
+// maxConcurrentFetches bounds how many outbound fetches — feed polls, page
+// discovery, and article scrapes — run at once across all goroutines. It
+// prevents a thundering herd (e.g. every feed's timer firing at once after a
+// restart, or several feeds scraping simultaneously at 4 pages each) from
+// opening an unbounded number of simultaneous connections.
+const maxConcurrentFetches = 8
 
 // perScrapeTimeout is applied to each individual article fetch independently
 // of any outer poll timeout, so one slow page doesn't starve the rest.
@@ -95,6 +109,10 @@ var readerPolicy = func() *bluemonday.Policy {
 	p.AllowAttrs("datetime").OnElements("time")
 	p.AllowAttrs("title").OnElements("abbr")
 	p.AllowAttrs("open").OnElements("details")
+	// srcset/sizes for responsive images. bluemonday does not URL-validate
+	// srcset (only href/src), so resolveSrcset scheme-filters entries before
+	// content reaches the sanitizer.
+	p.AllowAttrs("srcset", "sizes").OnElements("img")
 	return p
 }()
 
@@ -105,11 +123,15 @@ func SanitizeHTML(html string) string {
 }
 
 type Scraper struct {
-	client   *http.Client
-	fetchSem chan struct{} // bounds concurrent feed/page fetches
+	client        *http.Client
+	fetchSem      chan struct{} // bounds concurrent feed/page fetches
+	jsRenderWSURL string        // CDP endpoint for JS rendering; empty = not configured
 }
 
-func New() *Scraper {
+// New builds the hardened scraper. jsRenderWSURL is the optional DevTools
+// websocket endpoint (e.g. "ws://laserfeed-chrome:9222/") used for feeds with
+// JS rendering enabled; pass "" to leave the feature unconfigured.
+func New(jsRenderWSURL string) *Scraper {
 	dialer := &net.Dialer{
 		Timeout:   10 * time.Second,
 		KeepAlive: 30 * time.Second,
@@ -135,7 +157,8 @@ func New() *Scraper {
 				return nil
 			},
 		},
-		fetchSem: make(chan struct{}, maxConcurrentFeedFetches),
+		fetchSem:      make(chan struct{}, maxConcurrentFetches),
+		jsRenderWSURL: jsRenderWSURL,
 	}
 }
 
@@ -148,6 +171,74 @@ func (s *Scraper) acquireFetch(ctx context.Context) (release func(), err error) 
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
+}
+
+// readBodyLimited reads at most maxBodySize bytes and errors when the body is
+// larger, rather than silently truncating — a truncated HTML page or feed
+// extracts garbage with no diagnostic.
+func readBodyLimited(r io.Reader) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(r, maxBodySize+1))
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+	if len(body) > maxBodySize {
+		return nil, fmt.Errorf("body exceeds %d MB limit", maxBodySize>>20)
+	}
+	return body, nil
+}
+
+// decodeHTML converts a raw HTML body to UTF-8 using the Content-Type header,
+// BOM, and <meta charset> sniffing. Best effort: on any failure the body is
+// returned as-is (most of the web is UTF-8 already).
+func decodeHTML(body []byte, contentType string) string {
+	r, err := charset.NewReader(bytes.NewReader(body), contentType)
+	if err != nil {
+		return string(body)
+	}
+	decoded, err := io.ReadAll(r)
+	if err != nil {
+		return string(body)
+	}
+	return string(decoded)
+}
+
+// doFetchPage GETs a URL through the hardened client and returns the
+// size-limited body plus its Content-Type. Callers must hold a fetch slot.
+func (s *Scraper) doFetchPage(ctx context.Context, pageURL, userAgent, cookies string) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("User-Agent", userAgent)
+	if cookies != "" {
+		req.Header.Set("Cookie", cookies)
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("fetch page: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, "", fmt.Errorf("page returned HTTP %s", resp.Status)
+	}
+
+	body, err := readBodyLimited(resp.Body)
+	if err != nil {
+		return nil, "", err
+	}
+	return body, resp.Header.Get("Content-Type"), nil
+}
+
+// fetchPage is doFetchPage bounded by the global fetch semaphore.
+func (s *Scraper) fetchPage(ctx context.Context, pageURL, userAgent, cookies string) ([]byte, string, error) {
+	release, err := s.acquireFetch(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	defer release()
+	return s.doFetchPage(ctx, pageURL, userAgent, cookies)
 }
 
 // FeedResult is the outcome of a (possibly conditional) feed fetch.
@@ -194,9 +285,9 @@ func (s *Scraper) FetchFeed(ctx context.Context, url, userAgent, prevETag, prevL
 		return nil, fmt.Errorf("feed server returned %s", resp.Status)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodySize))
+	body, err := readBodyLimited(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
+		return nil, err
 	}
 
 	parser := gofeed.NewParser()
@@ -221,31 +312,11 @@ type DiscoveredFeed struct {
 // advertises via <link rel="alternate" type="application/(rss|atom|feed)+...">.
 // Relative hrefs are resolved against pageURL. Uses the same hardened client.
 func (s *Scraper) DiscoverFeeds(ctx context.Context, pageURL, userAgent string) ([]DiscoveredFeed, error) {
-	release, err := s.acquireFetch(ctx)
+	body, contentType, err := s.fetchPage(ctx, pageURL, userAgent, "")
 	if err != nil {
 		return nil, err
 	}
-	defer release()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("User-Agent", userAgent)
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("fetch page: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("page returned HTTP %s", resp.Status)
-	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodySize))
-	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
-	}
-	return discoverFeedsInHTML(string(body), pageURL)
+	return discoverFeedsInHTML(decodeHTML(body, contentType), pageURL)
 }
 
 // discoverFeedsInHTML is the pure parsing half of DiscoverFeeds (unit-testable).
@@ -285,73 +356,89 @@ func discoverFeedsInHTML(htmlBody, pageURL string) ([]DiscoveredFeed, error) {
 	return feeds, nil
 }
 
-// ScrapeContent fetches articleURL and extracts reader-view HTML. Each call has its
-// own 15-second deadline so a slow page cannot stall an entire poll cycle.
+// ScrapeOptions carries the per-feed configuration for a content scrape.
+type ScrapeOptions struct {
+	UserAgent          string
+	Method             string // "readability" (default) or "selector"
+	Selector           string
+	SelectorType       string // "css" (default) or "xpath"
+	Cookies            string // raw Cookie header value
+	StripSelectors     []string
+	PageStripSelectors []string
+	RenderJS           bool // render the page in a headless browser before extraction
+}
+
+// ScrapeContent fetches articleURL and extracts reader-view HTML. Each call has
+// its own network deadline so a slow page cannot stall an entire poll cycle.
 //
-// The method parameter controls the extraction pipeline:
+// opts.Method controls the extraction pipeline:
 //
 //	"readability" — strip selectors on raw page (classes intact) → readability → unwrap → sanitize
-//	"selector"    — extract via CSS/XPath content selector → strip selectors on fragment → sanitize
-func (s *Scraper) ScrapeContent(ctx context.Context, articleURL, userAgent, method, selector, selectorType, cookies string, stripSelectors, pageStripSelectors []string) (string, error) {
-	sctx, cancel := context.WithTimeout(ctx, perScrapeTimeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(sctx, http.MethodGet, articleURL, nil)
+//	"selector"    — extract via CSS/XPath content selector → strip selectors on fragment → resolve URLs → sanitize
+func (s *Scraper) ScrapeContent(ctx context.Context, articleURL string, opts ScrapeOptions) (string, error) {
+	// Wait for a global fetch slot against the caller's context, so queueing
+	// under load doesn't eat into the per-scrape network deadline. The slot is
+	// released as soon as the page is obtained; extraction is local CPU work.
+	release, err := s.acquireFetch(ctx)
 	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
+		return "", err
 	}
-	req.Header.Set("User-Agent", userAgent)
-	if cookies != "" {
-		req.Header.Set("Cookie", cookies)
+	var page string
+	if opts.RenderJS {
+		page, err = s.renderPage(ctx, articleURL, opts.UserAgent, opts.Cookies)
+	} else {
+		var body []byte
+		var contentType string
+		sctx, cancel := context.WithTimeout(ctx, perScrapeTimeout)
+		body, contentType, err = s.doFetchPage(sctx, articleURL, opts.UserAgent, opts.Cookies)
+		cancel()
+		if err == nil {
+			page = decodeHTML(body, contentType)
+		}
 	}
-
-	resp, err := s.client.Do(req)
+	release()
 	if err != nil {
-		return "", fmt.Errorf("fetch page: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("page returned HTTP %s", resp.Status)
+		return "", err
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodySize))
-	if err != nil {
-		return "", fmt.Errorf("read body: %w", err)
-	}
+	// Promote lazy-loading image attributes (data-src etc.) to real src/srcset
+	// before extraction, so images survive both extraction and sanitisation.
+	page = normalizeLazyImages(page)
 
 	var raw string
-	if method == "selector" {
+	if opts.Method == "selector" {
 		// Selector mode: extract content fragment, then apply both strip lists on the fragment.
-		if selectorType == "xpath" {
-			raw, err = extractXPath(string(body), selector)
+		if opts.SelectorType == "xpath" {
+			raw, err = extractXPath(page, opts.Selector)
 		} else {
-			raw, err = extractCSS(string(body), selector)
+			raw, err = extractCSS(page, opts.Selector)
 		}
 		if err != nil {
 			return "", err
 		}
-		combined := make([]string, 0, len(pageStripSelectors)+len(stripSelectors))
-		combined = append(combined, pageStripSelectors...)
-		combined = append(combined, stripSelectors...)
+		combined := make([]string, 0, len(opts.PageStripSelectors)+len(opts.StripSelectors))
+		combined = append(combined, opts.PageStripSelectors...)
+		combined = append(combined, opts.StripSelectors...)
 		if len(combined) > 0 {
 			if stripped, err := applyStripSelectors(raw, combined); err == nil {
 				raw = stripped
 			}
 		}
+		// Readability resolves relative URLs itself; selector extraction must do
+		// it explicitly or site-relative images/links break inside RSS readers.
+		raw = resolveRelativeURLs(raw, articleURL)
 	} else {
 		// Readability mode: two-pass strip on the raw page (classes still intact),
 		// then run readability on the cleaned page.
 		// Pass 1: page strip selectors run unscoped against the full page.
 		// Pass 2: content strip selectors run scoped by the content selector.
-		page := string(body)
-		if len(pageStripSelectors) > 0 {
-			if stripped, err := applyStripSelectors(page, pageStripSelectors); err == nil {
+		if len(opts.PageStripSelectors) > 0 {
+			if stripped, err := applyStripSelectors(page, opts.PageStripSelectors); err == nil {
 				page = stripped
 			}
 		}
-		if len(stripSelectors) > 0 {
-			scoped := scopeStripSelectors(stripSelectors, selector)
+		if len(opts.StripSelectors) > 0 {
+			scoped := scopeStripSelectors(opts.StripSelectors, opts.Selector)
 			if stripped, err := applyStripSelectors(page, scoped); err == nil {
 				page = stripped
 			}
@@ -363,6 +450,115 @@ func (s *Scraper) ScrapeContent(ctx context.Context, articleURL, userAgent, meth
 	}
 
 	return readerPolicy.Sanitize(raw), nil
+}
+
+// lazySrcAttrs are attributes lazy-loading libraries stash the real image URL
+// in while src holds a placeholder (or nothing) until JS swaps it in.
+var lazySrcAttrs = []string{"data-src", "data-lazy-src", "data-original"}
+var lazySrcsetAttrs = []string{"data-srcset", "data-lazy-srcset"}
+
+// normalizeLazyImages promotes lazy-loading attributes to real src/srcset so
+// images survive extraction and sanitisation (which strips data-* attributes).
+// Returns the page unchanged when no lazy images are found.
+func normalizeLazyImages(page string) string {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(page))
+	if err != nil {
+		return page
+	}
+	changed := false
+	doc.Find("img").Each(func(_ int, s *goquery.Selection) {
+		// A data: src is a placeholder (blank GIF / blurred inline preview).
+		if src, _ := s.Attr("src"); src == "" || strings.HasPrefix(src, "data:") {
+			for _, attr := range lazySrcAttrs {
+				if v, ok := s.Attr(attr); ok && strings.TrimSpace(v) != "" {
+					s.SetAttr("src", strings.TrimSpace(v))
+					changed = true
+					break
+				}
+			}
+		}
+		if srcset, _ := s.Attr("srcset"); srcset == "" {
+			for _, attr := range lazySrcsetAttrs {
+				if v, ok := s.Attr(attr); ok && strings.TrimSpace(v) != "" {
+					s.SetAttr("srcset", strings.TrimSpace(v))
+					changed = true
+					break
+				}
+			}
+		}
+	})
+	if !changed {
+		return page
+	}
+	out, err := doc.Html()
+	if err != nil {
+		return page
+	}
+	return out
+}
+
+// resolveRelativeURLs rewrites relative src/href/poster/srcset attributes in an
+// HTML fragment to absolute URLs against the article URL. srcset entries with a
+// scheme other than http(s) are dropped because the sanitizer does not
+// URL-validate srcset.
+func resolveRelativeURLs(fragment, baseURL string) string {
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return fragment
+	}
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(fragment))
+	if err != nil {
+		return fragment
+	}
+	resolve := func(raw string) string {
+		raw = strings.TrimSpace(raw)
+		if raw == "" || strings.HasPrefix(raw, "data:") || strings.HasPrefix(raw, "#") {
+			return raw
+		}
+		ref, err := url.Parse(raw)
+		if err != nil || ref.IsAbs() {
+			return raw
+		}
+		return base.ResolveReference(ref).String()
+	}
+	for _, attr := range []string{"src", "href", "poster"} {
+		doc.Find("[" + attr + "]").Each(func(_ int, s *goquery.Selection) {
+			if v, ok := s.Attr(attr); ok {
+				s.SetAttr(attr, resolve(v))
+			}
+		})
+	}
+	doc.Find("[srcset]").Each(func(_ int, s *goquery.Selection) {
+		if v, ok := s.Attr("srcset"); ok {
+			s.SetAttr("srcset", resolveSrcset(v, resolve))
+		}
+	})
+	out, err := doc.Find("body").Html()
+	if err != nil {
+		return fragment
+	}
+	return out
+}
+
+// resolveSrcset resolves each URL in a srcset value, preserving width/density
+// descriptors and dropping entries that don't resolve to http(s). Splitting on
+// "," is imperfect for data: URIs containing commas, but those are dropped
+// entries anyway.
+func resolveSrcset(srcset string, resolve func(string) string) string {
+	parts := strings.Split(srcset, ",")
+	kept := make([]string, 0, len(parts))
+	for _, part := range parts {
+		fields := strings.Fields(strings.TrimSpace(part))
+		if len(fields) == 0 {
+			continue
+		}
+		fields[0] = resolve(fields[0])
+		if !strings.HasPrefix(fields[0], "http://") && !strings.HasPrefix(fields[0], "https://") {
+			continue
+		}
+		kept = append(kept, strings.Join(fields, " "))
+	}
+	return strings.Join(kept, ", ")
 }
 
 // scopeStripSelectors prepends a scope selector to each strip selector so that

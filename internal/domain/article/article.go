@@ -55,6 +55,11 @@ type Repository interface {
 	UpdateThumbnail(ctx context.Context, id, thumbnailURL string) error
 	GetScrapeStats(ctx context.Context, feedID string) (*ScrapeStats, error)
 	GetScrapedGUIDs(ctx context.Context, feedID string) (map[string]bool, error)
+	// GetScrapedContents maps guid→stored content for scraped articles, used to
+	// evaluate content filter rules consistently on re-polls.
+	GetScrapedContents(ctx context.Context, feedID string) (map[string]string, error)
+	// GetTombstonedGUIDs lists GUIDs deleted by retention; ingest skips them.
+	GetTombstonedGUIDs(ctx context.Context, feedID string) (map[string]bool, error)
 	ListForReScrape(ctx context.Context, feedID string) ([]*ArticleRef, error)
 	PurgeScrapeContent(ctx context.Context, feedID string) error
 	PurgeOldScrapeContent(ctx context.Context, feedID string, maxAgeDays int) error

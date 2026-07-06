@@ -43,6 +43,10 @@ templ FeedEdit(csrfToken string, f *feed.Feed, scrapeStats *article.ScrapeStats)
 						<sl-switch name="scrape_full_content" value="true" checked?={ f.ScrapeFullContent }>
 							Scrape full article content
 						</sl-switch>
+						<sl-switch name="scrape_render_js" value="true" checked?={ f.ScrapeRenderJS }
+							help-text="Load pages in a headless browser before extraction, for sites that render their content with JavaScript. Requires the browser container (JS_RENDER_WS_URL) — see the README. Slower than a plain fetch; enable only when normal scraping comes up empty.">
+							Render JavaScript
+						</sl-switch>
 					</div>
 					<sl-select name="scrape_method" label="Extraction method" value={ string(f.ScrapeMethod) }
 						help-text="Readability automatically extracts the main article content. Selector lets you target a specific element with CSS or XPath.">

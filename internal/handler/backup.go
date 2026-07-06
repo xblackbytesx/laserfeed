@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v5"
@@ -32,9 +33,12 @@ type backupFeed struct {
 	ScrapeSelector           *string      `json:"scrape_selector,omitempty"`
 	ScrapeSelectorType       string       `json:"scrape_selector_type"`
 	ScrapeMaxAgeDays         int          `json:"scrape_max_age_days"`
+	ScrapeRenderJS           bool         `json:"scrape_render_js,omitempty"`
 	ScrapeCookies            *string      `json:"scrape_cookies,omitempty"`
 	ScrapeStripSelectors     *string      `json:"scrape_strip_selectors,omitempty"`
 	ScrapePageStripSelectors *string      `json:"scrape_page_strip_selectors,omitempty"`
+	RetentionMaxItems        int          `json:"retention_max_items,omitempty"`
+	RetentionMaxHours        int          `json:"retention_max_hours,omitempty"`
 	ImageMode                string       `json:"image_mode"`
 	PlaceholderImageURL      *string      `json:"placeholder_image_url,omitempty"`
 	FilterRules              []backupRule `json:"filter_rules,omitempty"`
@@ -54,6 +58,50 @@ type backupChannel struct {
 }
 
 const maxImportSize = 5 << 20 // 5 MB
+
+// dropIfOverLength returns nil (dropping the field) when the value exceeds the
+// same length limit the form handlers enforce, so a hand-edited backup cannot
+// smuggle in oversized values.
+func dropIfOverLength(v *string, maxLen int, feedURL, field string) *string {
+	if v != nil && len(*v) > maxLen {
+		slog.Warn("import: dropping over-length field", "feed_url", feedURL, "field", field, "max", maxLen)
+		return nil
+	}
+	return v
+}
+
+// clampImportedFeed enforces the bounds the form handlers apply to manual
+// input. Imports are forgiving: out-of-range scalars are clamped and invalid
+// optional fields are dropped with a warning rather than failing the import.
+func clampImportedFeed(bf *backupFeed) {
+	if bf.Name == "" {
+		bf.Name = bf.URL
+	}
+	if len(bf.Name) > 255 {
+		bf.Name = strings.ToValidUTF8(bf.Name[:255], "")
+	}
+	if bf.PollIntervalSeconds < 60 {
+		bf.PollIntervalSeconds = 3600
+	}
+	if bf.ScrapeMaxAgeDays < 0 {
+		bf.ScrapeMaxAgeDays = 0
+	}
+	if bf.RetentionMaxItems < 0 {
+		bf.RetentionMaxItems = 0
+	}
+	if bf.RetentionMaxHours < 0 {
+		bf.RetentionMaxHours = 0
+	}
+	bf.UserAgent = dropIfOverLength(bf.UserAgent, 500, bf.URL, "user_agent")
+	bf.ScrapeSelector = dropIfOverLength(bf.ScrapeSelector, 1000, bf.URL, "scrape_selector")
+	bf.ScrapeCookies = dropIfOverLength(bf.ScrapeCookies, 8192, bf.URL, "scrape_cookies")
+	bf.ScrapeStripSelectors = dropIfOverLength(bf.ScrapeStripSelectors, 4096, bf.URL, "scrape_strip_selectors")
+	bf.ScrapePageStripSelectors = dropIfOverLength(bf.ScrapePageStripSelectors, 4096, bf.URL, "scrape_page_strip_selectors")
+	if bf.PlaceholderImageURL != nil && validateFeedURL(*bf.PlaceholderImageURL) != nil {
+		slog.Warn("import: dropping invalid placeholder image URL", "feed_url", bf.URL)
+		bf.PlaceholderImageURL = nil
+	}
+}
 
 // Export streams the full configuration as a downloadable JSON file.
 func (h *SettingsHandler) Export(c *echo.Context) error {
@@ -102,9 +150,12 @@ func (h *SettingsHandler) Export(c *echo.Context) error {
 			ScrapeSelector:           f.ScrapeSelector,
 			ScrapeSelectorType:       string(f.ScrapeSelectorType),
 			ScrapeMaxAgeDays:         f.ScrapeMaxAgeDays,
+			ScrapeRenderJS:           f.ScrapeRenderJS,
 			ScrapeCookies:            f.ScrapeCookies,
 			ScrapeStripSelectors:     f.ScrapeStripSelectors,
 			ScrapePageStripSelectors: f.ScrapePageStripSelectors,
+			RetentionMaxItems:        f.RetentionMaxItems,
+			RetentionMaxHours:        f.RetentionMaxHours,
 			ImageMode:                string(f.ImageMode),
 			PlaceholderImageURL:      f.PlaceholderImageURL,
 		}
@@ -207,6 +258,7 @@ func (h *SettingsHandler) Import(c *echo.Context) error {
 			slog.Warn("import: skipping feed with invalid URL", "url", bf.URL)
 			continue
 		}
+		clampImportedFeed(&bf)
 
 		var feedID string
 
@@ -220,9 +272,12 @@ func (h *SettingsHandler) Import(c *echo.Context) error {
 			existing.ScrapeSelector = bf.ScrapeSelector
 			existing.ScrapeSelectorType = feed.NormalizeSelectorType(bf.ScrapeSelectorType)
 			existing.ScrapeMaxAgeDays = bf.ScrapeMaxAgeDays
+			existing.ScrapeRenderJS = bf.ScrapeRenderJS
 			existing.ScrapeCookies = bf.ScrapeCookies
 			existing.ScrapeStripSelectors = bf.ScrapeStripSelectors
 			existing.ScrapePageStripSelectors = bf.ScrapePageStripSelectors
+			existing.RetentionMaxItems = bf.RetentionMaxItems
+			existing.RetentionMaxHours = bf.RetentionMaxHours
 			existing.ImageMode = feed.NormalizeImageMode(bf.ImageMode)
 			existing.PlaceholderImageURL = bf.PlaceholderImageURL
 
@@ -232,8 +287,12 @@ func (h *SettingsHandler) Import(c *echo.Context) error {
 				return echo.NewHTTPError(http.StatusInternalServerError, "failed to update feed: "+bf.URL)
 			}
 			feedID = existing.ID
-			h.poller.StartFeed(updated)
-			h.poller.ForceRefresh(feedID)
+			if updated.Enabled {
+				h.poller.StartFeed(updated)
+				h.poller.ForceRefresh(feedID)
+			} else {
+				h.poller.StopFeed(feedID)
+			}
 		} else {
 			created, err := h.feeds.Create(ctx, &feed.Feed{
 				Name:                     bf.Name,
@@ -246,9 +305,12 @@ func (h *SettingsHandler) Import(c *echo.Context) error {
 				ScrapeSelector:           bf.ScrapeSelector,
 				ScrapeSelectorType:       feed.NormalizeSelectorType(bf.ScrapeSelectorType),
 				ScrapeMaxAgeDays:         bf.ScrapeMaxAgeDays,
+				ScrapeRenderJS:           bf.ScrapeRenderJS,
 				ScrapeCookies:            bf.ScrapeCookies,
 				ScrapeStripSelectors:     bf.ScrapeStripSelectors,
 				ScrapePageStripSelectors: bf.ScrapePageStripSelectors,
+				RetentionMaxItems:        bf.RetentionMaxItems,
+				RetentionMaxHours:        bf.RetentionMaxHours,
 				ImageMode:                feed.NormalizeImageMode(bf.ImageMode),
 				PlaceholderImageURL:      bf.PlaceholderImageURL,
 			})
@@ -257,8 +319,10 @@ func (h *SettingsHandler) Import(c *echo.Context) error {
 				return echo.NewHTTPError(http.StatusInternalServerError, "failed to create feed: "+bf.URL)
 			}
 			feedID = created.ID
-			h.poller.StartFeed(created)
-			h.poller.ForceRefresh(feedID)
+			if created.Enabled {
+				h.poller.StartFeed(created)
+				h.poller.ForceRefresh(feedID)
+			}
 		}
 
 		importedFeedID[bf.URL] = feedID
@@ -373,6 +437,7 @@ func (h *SettingsHandler) Import(c *echo.Context) error {
 		}
 	}
 
+	h.feedOut.InvalidateAll()
 	slog.Info("import completed", "feeds", len(doc.Feeds), "channels", len(doc.Channels))
 	return redirect(c, "/settings")
 }

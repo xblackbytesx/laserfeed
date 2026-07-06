@@ -18,7 +18,7 @@ func NewFeedStore(db *pgxpool.Pool) *FeedStore {
 }
 
 const feedCols = `feeds.id, feeds.name, feeds.url, feeds.enabled, feeds.poll_interval_seconds, feeds.user_agent,
-	feeds.scrape_full_content, feeds.scrape_method, feeds.scrape_selector, feeds.scrape_selector_type, feeds.scrape_max_age_days, feeds.scrape_cookies,
+	feeds.scrape_full_content, feeds.scrape_method, feeds.scrape_selector, feeds.scrape_selector_type, feeds.scrape_max_age_days, feeds.scrape_render_js, feeds.scrape_cookies,
 	feeds.scrape_strip_selectors, feeds.scrape_page_strip_selectors,
 	feeds.retention_max_items, feeds.retention_max_hours,
 	feeds.image_mode, feeds.placeholder_image_url, feeds.last_polled_at, feeds.last_error,
@@ -31,7 +31,7 @@ func scanFeed(row interface{ Scan(...any) error }) (*feed.Feed, error) {
 	var imageModeStr, scrapeMethodStr, selectorTypeStr string
 	err := row.Scan(
 		&f.ID, &f.Name, &f.URL, &f.Enabled, &f.PollIntervalSeconds, &userAgent,
-		&f.ScrapeFullContent, &scrapeMethodStr, &scrapeSelector, &selectorTypeStr, &f.ScrapeMaxAgeDays, &scrapeCookies,
+		&f.ScrapeFullContent, &scrapeMethodStr, &scrapeSelector, &selectorTypeStr, &f.ScrapeMaxAgeDays, &f.ScrapeRenderJS, &scrapeCookies,
 		&scrapeStripSelectors, &scrapePageStripSelectors,
 		&f.RetentionMaxItems, &f.RetentionMaxHours,
 		&imageModeStr, &placeholderImageURL, &lastPolledAt, &lastError,
@@ -58,14 +58,14 @@ func scanFeed(row interface{ Scan(...any) error }) (*feed.Feed, error) {
 func (s *FeedStore) Create(ctx context.Context, f *feed.Feed) (*feed.Feed, error) {
 	row := s.db.QueryRow(ctx,
 		`INSERT INTO feeds (name, url, enabled, poll_interval_seconds, user_agent,
-			scrape_full_content, scrape_method, scrape_selector, scrape_selector_type, scrape_max_age_days, scrape_cookies,
+			scrape_full_content, scrape_method, scrape_selector, scrape_selector_type, scrape_max_age_days, scrape_render_js, scrape_cookies,
 			scrape_strip_selectors, scrape_page_strip_selectors,
 			retention_max_items, retention_max_hours,
 			image_mode, placeholder_image_url)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 		RETURNING `+feedCols,
 		f.Name, f.URL, f.Enabled, f.PollIntervalSeconds, f.UserAgent,
-		f.ScrapeFullContent, string(f.ScrapeMethod), f.ScrapeSelector, string(f.ScrapeSelectorType), f.ScrapeMaxAgeDays, f.ScrapeCookies,
+		f.ScrapeFullContent, string(f.ScrapeMethod), f.ScrapeSelector, string(f.ScrapeSelectorType), f.ScrapeMaxAgeDays, f.ScrapeRenderJS, f.ScrapeCookies,
 		f.ScrapeStripSelectors, f.ScrapePageStripSelectors,
 		f.RetentionMaxItems, f.RetentionMaxHours,
 		string(f.ImageMode), f.PlaceholderImageURL,
@@ -147,15 +147,15 @@ func (s *FeedStore) Update(ctx context.Context, f *feed.Feed) (*feed.Feed, error
 	row := s.db.QueryRow(ctx,
 		`UPDATE feeds SET name=$1, url=$2, enabled=$3, poll_interval_seconds=$4,
 			user_agent=$5, scrape_full_content=$6, scrape_method=$7, scrape_selector=$8,
-			scrape_selector_type=$9, scrape_max_age_days=$10, scrape_cookies=$11,
-			scrape_strip_selectors=$12, scrape_page_strip_selectors=$13,
-			retention_max_items=$14, retention_max_hours=$15,
-			image_mode=$16, placeholder_image_url=$17,
+			scrape_selector_type=$9, scrape_max_age_days=$10, scrape_render_js=$11, scrape_cookies=$12,
+			scrape_strip_selectors=$13, scrape_page_strip_selectors=$14,
+			retention_max_items=$15, retention_max_hours=$16,
+			image_mode=$17, placeholder_image_url=$18,
 			updated_at=NOW()
-		WHERE id=$18
+		WHERE id=$19
 		RETURNING `+feedCols,
 		f.Name, f.URL, f.Enabled, f.PollIntervalSeconds, f.UserAgent,
-		f.ScrapeFullContent, string(f.ScrapeMethod), f.ScrapeSelector, string(f.ScrapeSelectorType), f.ScrapeMaxAgeDays, f.ScrapeCookies,
+		f.ScrapeFullContent, string(f.ScrapeMethod), f.ScrapeSelector, string(f.ScrapeSelectorType), f.ScrapeMaxAgeDays, f.ScrapeRenderJS, f.ScrapeCookies,
 		f.ScrapeStripSelectors, f.ScrapePageStripSelectors,
 		f.RetentionMaxItems, f.RetentionMaxHours,
 		string(f.ImageMode), f.PlaceholderImageURL, f.ID,
